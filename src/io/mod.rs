@@ -15,21 +15,21 @@ pub enum NbsIOError {
 #[macro_export(local_inner_macros)]
 macro_rules! nbsver_required {
     ($version: ident = $required: ident, $newer: expr, $older: expr) => {
-        if $version == crate::nbs::NbsVersion::$required {
+        if $version == $crate::nbs::NbsVersion::$required {
             $newer
         } else {
             $older
         }
     };
     ($version: ident > $required: ident, $newer: expr, $older: expr) => {
-        if $version > crate::nbs::NbsVersion::$required {
+        if $version > $crate::nbs::NbsVersion::$required {
             $newer
         } else {
             $older
         }
     };
     ($version: ident >= $required: ident, $newer: expr, $older: expr) => {
-        if $version >= crate::nbs::NbsVersion::$required {
+        if $version >= $crate::nbs::NbsVersion::$required {
             $newer
         } else {
             $older

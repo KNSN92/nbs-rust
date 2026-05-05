@@ -94,11 +94,11 @@ impl NoteBlocks {
     pub fn place_note(&mut self, tick: Tick, layer: Layer, note: Note) {
         self.len = self.len.max(tick + 1);
 
-        let notes = self.by_tick_notes.entry(tick).or_insert_with(|| vec![]);
+        let notes = self.by_tick_notes.entry(tick).or_default();
         notes.push((layer, note));
         notes.sort_by_key(|(l, _)| *l);
 
-        let notes = self.by_layer_notes.entry(layer).or_insert_with(|| vec![]);
+        let notes = self.by_layer_notes.entry(layer).or_default();
         notes.push((tick, note));
         notes.sort_by_key(|(t, _)| *t);
 
@@ -111,6 +111,12 @@ impl NoteBlocks {
 
     pub fn inner_layer_notes(&self) -> &HashMap<Layer, NotesInLayer> {
         &self.by_layer_notes
+    }
+}
+
+impl Default for NoteBlocks {
+    fn default() -> Self {
+        NoteBlocks::new()
     }
 }
 

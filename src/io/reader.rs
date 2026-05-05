@@ -48,8 +48,7 @@ fn read_header(reader: &mut impl Read) -> Result<(NbsVersion, Header), NbsIOErro
 
     let classic_song_len = reader.read_u16::<LittleEndian>()?;
     let version = match classic_song_len {
-        0 => NbsVersion::try_from(reader.read_u8()?)
-            .map_err(|version| NbsIOError::UnsupportedVersion(version))?,
+        0 => NbsVersion::try_from(reader.read_u8()?).map_err(NbsIOError::UnsupportedVersion)?,
         _ => NbsVersion::Classic,
     };
     header.song_meta.vanilla_instruments =
@@ -114,12 +113,13 @@ fn read_note_blocks(reader: &mut impl Read, version: NbsVersion) -> Result<NoteB
                 break;
             }
             layer = layer.wrapping_add(jump_layers);
-            let mut note = Note::default();
-            note.instrument = Instrument(reader.read_u8()?);
-            note.key = reader.read_u8()?;
-            note.volume = nbsver_required!(version >= V4, reader.read_u8()?, 100);
-            note.panning = nbsver_required!(version >= V4, reader.read_u8()?, 0);
-            note.pitch = nbsver_required!(version >= V4, reader.read_i16::<LittleEndian>()?, 0);
+            let note = Note {
+                instrument: Instrument(reader.read_u8()?),
+                key: reader.read_u8()?,
+                volume: nbsver_required!(version >= V4, reader.read_u8()?, 100),
+                panning: nbsver_required!(version >= V4, reader.read_u8()?, 0),
+                pitch: nbsver_required!(version >= V4, reader.read_i16::<LittleEndian>()?, 0),
+            };
             note_blocks.place_note(tick, layer, note);
         }
     }
@@ -166,11 +166,12 @@ fn read_custom_instruments(
         Err(e) => return Err(e.into()),
     };
     for _ in 0..custom_instrument_count {
-        let mut custom_instrument = CustomInstrument::default();
-        custom_instrument.name = reader.read_string_len_i32::<LittleEndian>()?;
-        custom_instrument.file_name = reader.read_string_len_i32::<LittleEndian>()?;
-        custom_instrument.key = reader.read_u8()?;
-        custom_instrument.press_piano_key = reader.read_u8()? != 0;
+        let custom_instrument = CustomInstrument {
+            name: reader.read_string_len_i32::<LittleEndian>()?,
+            file_name: reader.read_string_len_i32::<LittleEndian>()?,
+            key: reader.read_u8()?,
+            press_piano_key: reader.read_u8()? != 0,
+        };
         custom_instruments.push(custom_instrument);
     }
     Ok(custom_instruments)
