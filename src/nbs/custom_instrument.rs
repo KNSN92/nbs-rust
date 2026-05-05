@@ -48,15 +48,40 @@ impl CustomInstruments {
         }
     }
 
-    pub fn push(&mut self, custom_instrument: CustomInstrument) {
+    pub fn get_mut(&mut self, instrument: Instrument) -> Option<&mut CustomInstrument> {
+        match instrument {
+            Instrument(id) if id >= self.vanilla_instruments => self
+                .instruments
+                .get_mut((id - self.vanilla_instruments) as usize),
+            _ => None,
+        }
+    }
+
+    pub fn push(&mut self, custom_instrument: CustomInstrument) -> Result<(), CustomInstrument> {
+        if self.instruments.len() + self.vanilla_instruments as usize >= 256 {
+            return Err(custom_instrument);
+        }
         self.instruments.push(custom_instrument);
+        Ok(())
     }
 
     pub fn instruments(&self) -> &[CustomInstrument] {
         &self.instruments
     }
 
-    pub fn count(&self) -> usize {
-        self.instruments.len()
+    pub fn instruments_mut(&mut self) -> &mut [CustomInstrument] {
+        &mut self.instruments
+    }
+
+    pub(crate) fn into_vec(self) -> Vec<CustomInstrument> {
+        self.instruments
+    }
+
+    pub fn vanilla_instrument_count(&self) -> u8 {
+        self.vanilla_instruments
+    }
+
+    pub fn count(&self) -> u8 {
+        self.instruments.len() as u8
     }
 }
