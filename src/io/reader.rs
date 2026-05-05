@@ -30,7 +30,8 @@ impl<R: ReadBytesExt + ?Sized> ReadStringExt for R {}
 
 pub fn read_nbs(reader: &mut impl Read) -> Result<Nbs, NbsIOError> {
     let (version, header) = read_header(reader)?;
-    let note_blocks = read_note_blocks(reader, version)?;
+    let note_blocks = NoteBlocks::new();
+    let note_blocks = read_note_blocks(reader, version, note_blocks)?;
     let note_blocks = read_layers(reader, version, header.song_meta.layers, note_blocks)?;
     let custom_instruments = read_custom_instruments(reader, header.song_meta.vanilla_instruments)?;
     Ok(Nbs {
@@ -87,8 +88,11 @@ pub fn read_header(reader: &mut impl Read) -> Result<(NbsVersion, Header), NbsIO
     Ok((version, header))
 }
 
-fn read_note_blocks(reader: &mut impl Read, version: NbsVersion) -> Result<NoteBlocks, NbsIOError> {
-    let mut note_blocks = NoteBlocks::new();
+fn read_note_blocks(
+    reader: &mut impl Read,
+    version: NbsVersion,
+    mut note_blocks: NoteBlocks,
+) -> Result<NoteBlocks, NbsIOError> {
     let mut tick = u32::MAX;
     loop {
         let jump_ticks = reader.read_u16::<LittleEndian>()?;
