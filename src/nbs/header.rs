@@ -1,3 +1,5 @@
+use std::num::NonZeroU8;
+
 #[derive(Debug, Default)]
 pub struct SongMetadata {
     pub vanilla_instruments: u8,
@@ -25,10 +27,10 @@ pub struct SongStats {
 }
 
 #[derive(Debug)]
-pub enum Looping {
-    NoLooping,
-    Finite { count: u8, loop_start_tick: u16 },
-    Infinite { loop_start_tick: u16 },
+pub struct Looping {
+    pub enabled: bool,
+    pub count: Option<NonZeroU8>,
+    pub start_tick: u16,
 }
 
 #[derive(Debug)]
@@ -74,7 +76,11 @@ impl Default for Header {
                 enabled: false,
                 duration: 10,
             },
-            looping: Looping::NoLooping,
+            looping: Looping {
+                enabled: false,
+                count: None,
+                start_tick: 0,
+            },
             midi_schematic_file_name: "".to_string(),
         }
     }

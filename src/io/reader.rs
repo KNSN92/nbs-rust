@@ -1,4 +1,7 @@
-use std::io::{ErrorKind, Read};
+use std::{
+    io::{ErrorKind, Read},
+    num::NonZeroU8,
+};
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
@@ -70,22 +73,16 @@ pub fn read_header(reader: &mut impl Read) -> Result<(NbsVersion, Header), NbsIO
     header.midi_schematic_file_name = reader.read_string_len_i32::<LittleEndian>()?;
     header.looping = nbsver_required!(
         version >= V4,
-        match (
-            reader.read_u8()?,
-            reader.read_u8()?,
-            reader.read_u16::<LittleEndian>()?,
-        ) {
-            // loop == 0 means no looping
-            (0, _, _) => Looping::NoLooping,
-            // count == 0 means infinite looping
-            (_, 0, loop_start_tick) => Looping::Infinite { loop_start_tick },
-            // otherwise, we have finite looping
-            (_, count, loop_start_tick) => Looping::Finite {
-                count,
-                loop_start_tick,
-            },
+        Looping {
+            enabled: reader.read_u8()? != 0,
+            count: NonZeroU8::new(reader.read_u8()?),
+            start_tick: reader.read_u16::<LittleEndian>()?,
         },
-        Looping::NoLooping
+        Looping {
+            enabled: false,
+            count: None,
+            start_tick: 0,
+        }
     );
     Ok((version, header))
 }
