@@ -25,22 +25,17 @@ pub trait ReadStringExt: byteorder::ReadBytesExt {
 
 impl<R: ReadBytesExt + ?Sized> ReadStringExt for R {}
 
-pub struct NbsReader;
-
-impl NbsReader {
-    pub fn read(reader: &mut impl Read) -> Result<Nbs, NbsIOError> {
-        let (version, header) = read_header(reader)?;
-        let note_blocks = read_note_blocks(reader, version)?;
-        let note_blocks = read_layers(reader, version, header.song_meta.layers, note_blocks)?;
-        let custom_instruments =
-            read_custom_instruments(reader, header.song_meta.vanilla_instruments)?;
-        Ok(Nbs {
-            version,
-            header,
-            note_blocks,
-            custom_instruments,
-        })
-    }
+pub fn read_nbs(reader: &mut impl Read) -> Result<Nbs, NbsIOError> {
+    let (version, header) = read_header(reader)?;
+    let note_blocks = read_note_blocks(reader, version)?;
+    let note_blocks = read_layers(reader, version, header.song_meta.layers, note_blocks)?;
+    let custom_instruments = read_custom_instruments(reader, header.song_meta.vanilla_instruments)?;
+    Ok(Nbs {
+        version,
+        header,
+        note_blocks,
+        custom_instruments,
+    })
 }
 
 fn read_header(reader: &mut impl Read) -> Result<(NbsVersion, Header), NbsIOError> {

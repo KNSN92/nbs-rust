@@ -6,7 +6,7 @@ mod io;
 pub mod nbs;
 
 pub use instrument::Instrument;
-pub use io::{NbsIOError, NbsReader, NbsWriter};
+pub use io::*;
 pub use nbs::Nbs;
 
 #[cfg(test)]
