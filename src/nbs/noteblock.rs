@@ -31,6 +31,7 @@ pub type NotesInLayer = Vec<(Tick, Note)>;
 #[derive(Debug)]
 pub struct NoteBlocks {
     len: Tick,
+    ticks: Vec<Tick>,
     layers: Vec<LayerMetadata>,
     by_tick_notes: HashMap<Tick, NotesInTick>,
     by_layer_notes: HashMap<Layer, NotesInLayer>,
@@ -40,13 +41,14 @@ impl NoteBlocks {
     pub fn new() -> Self {
         NoteBlocks {
             len: 0,
+            ticks: Vec::new(),
             layers: Vec::new(),
             by_tick_notes: HashMap::new(),
             by_layer_notes: HashMap::new(),
         }
     }
 
-    pub fn ticks(&self) -> Tick {
+    pub fn ticks_len(&self) -> Tick {
         self.len
     }
 
@@ -54,8 +56,16 @@ impl NoteBlocks {
         self.layers.len()
     }
 
+    pub fn ticks(&self) -> &[Tick] {
+        &self.ticks
+    }
+
     pub fn layers(&self) -> &[LayerMetadata] {
         &self.layers
+    }
+
+    pub(crate) fn into_layers(self) -> Vec<LayerMetadata> {
+        self.layers
     }
 
     pub(crate) fn extend_layers(&mut self, layer: Layer) {
@@ -102,6 +112,13 @@ impl NoteBlocks {
         notes.push((tick, note));
         notes.sort_by_key(|(t, _)| *t);
 
+        // If the tick is new, insert it into the ticks vector while keeping it sorted
+        let _ = self
+            .ticks
+            .binary_search(&tick)
+            .map_err(|i| self.ticks.insert(i, tick));
+
+        // If the layer is new, extend the layers to accommodate it
         self.extend_layers(layer);
     }
 
