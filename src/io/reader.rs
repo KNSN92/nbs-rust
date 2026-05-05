@@ -165,7 +165,7 @@ fn read_custom_instruments(
             key: reader.read_u8()?,
             press_piano_key: reader.read_u8()? != 0,
         };
-        custom_instruments.push(custom_instrument);
+        custom_instruments.push(custom_instrument).unwrap();
     }
     Ok(custom_instruments)
 }
