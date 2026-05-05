@@ -1,0 +1,10 @@
+[package]
+name = "nbs-rust"
+version = "0.1.0"
+authors = ["KNSN92"]
+description = "A Rust library for IO and rendering audio of .nbs files."
+edition = "2024"
+
+[dependencies]
+byteorder = "1.5.0"
+thiserror = "2.0.18"
