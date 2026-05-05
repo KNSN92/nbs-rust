@@ -32,9 +32,9 @@ pub enum Looping {
 }
 
 #[derive(Debug)]
-pub enum AutoSaving {
-    Disabled { duration: u8 },
-    Enabled { duration: u8 },
+pub struct AutoSaving {
+    pub enabled: bool,
+    pub duration: u8,
 }
 
 #[derive(Debug)]
@@ -70,7 +70,10 @@ impl Default for Header {
                 note_blocks_added: 0,
                 note_blocks_removed: 0,
             },
-            auto_saving: AutoSaving::Disabled { duration: 10 },
+            auto_saving: AutoSaving {
+                enabled: false,
+                duration: 10,
+            },
             looping: Looping::NoLooping,
             midi_schematic_file_name: "".to_string(),
         }
