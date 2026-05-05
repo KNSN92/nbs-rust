@@ -38,7 +38,7 @@ pub fn read_nbs(reader: &mut impl Read) -> Result<Nbs, NbsIOError> {
     })
 }
 
-fn read_header(reader: &mut impl Read) -> Result<(NbsVersion, Header), NbsIOError> {
+pub fn read_header(reader: &mut impl Read) -> Result<(NbsVersion, Header), NbsIOError> {
     let mut header = Header::default();
 
     let classic_song_len = reader.read_u16::<LittleEndian>()?;

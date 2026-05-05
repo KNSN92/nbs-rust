@@ -1,7 +1,7 @@
 mod reader;
 mod writer;
 
-pub use reader::read_nbs;
+pub use reader::{read_header, read_nbs};
 pub use writer::NbsWriter;
 
 #[derive(Debug, thiserror::Error)]
