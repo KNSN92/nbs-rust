@@ -1,4 +1,4 @@
-use crate::Instrument;
+use crate::{Instrument, instrument::VANILLA_INSTRUMENT_COUNT};
 
 #[derive(Debug)]
 pub struct CustomInstrument {
@@ -79,5 +79,14 @@ impl CustomInstruments {
 
     pub fn count(&self) -> u8 {
         self.instruments.len() as u8
+    }
+}
+
+impl Default for CustomInstruments {
+    fn default() -> Self {
+        CustomInstruments {
+            instruments: vec![],
+            vanilla_instruments: VANILLA_INSTRUMENT_COUNT,
+        }
     }
 }
