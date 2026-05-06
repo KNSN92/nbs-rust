@@ -73,10 +73,6 @@ impl CustomInstruments {
         &mut self.instruments
     }
 
-    pub(crate) fn into_vec(self) -> Vec<CustomInstrument> {
-        self.instruments
-    }
-
     pub fn vanilla_instrument_count(&self) -> u8 {
         self.vanilla_instruments
     }
