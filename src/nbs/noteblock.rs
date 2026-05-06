@@ -98,7 +98,7 @@ impl NoteBlocks {
     }
 
     pub fn place_note(&mut self, tick: Tick, layer: Layer, note: Note) {
-        self.len = self.len.max(tick + 1);
+        self.len = self.len.max(tick);
 
         let notes = self.by_tick_notes.entry(tick).or_default();
         notes.push((layer, note));
