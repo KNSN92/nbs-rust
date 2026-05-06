@@ -64,8 +64,8 @@ impl NoteBlocks {
         &self.layers
     }
 
-    pub(crate) fn extend_layers(&mut self, layer: Layer) {
-        while self.layers.len() <= layer as usize {
+    pub(crate) fn extend_layers(&mut self, layer_count: Layer) {
+        while self.layers.len() < layer_count as usize {
             self.by_layer_notes
                 .insert(self.layers.len() as Layer, vec![]);
             self.layers.push(LayerMetadata::default());
