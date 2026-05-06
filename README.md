@@ -18,7 +18,7 @@ This crate aiming to provide a high-level, easy-to-use I/O interface and manipul
 ## Roadmap And TODO
 
 - [x] Reading NBS files
-- [ ] Writing NBS files
+- [x] Writing NBS files
 - [ ] Audio rendering engine [WIP]
 - [ ] Midi to NBS conversion
 - [ ] Brush up the API and ergonomics
@@ -47,7 +47,7 @@ NBSファイルを読み書きしたり、それを元に音声を生成した�
 ## ロードマップとTODO
 
 - [x] NBSファイルの読み込み
-- [ ] NBSファイルの書き込み
+- [x] NBSファイルの書き込み
 - [ ] オーディオ生成エンジン [WIP]
 - [ ] MidiからNBSへの変換
 - [ ] APIや使い勝手のブラッシュアップ
