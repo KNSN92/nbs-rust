@@ -14,6 +14,11 @@ pub enum NbsVersion {
     Classic = 0,
 }
 
+impl NbsVersion {
+    #[allow(non_upper_case_globals)]
+    pub const Latest: NbsVersion = NbsVersion::V5;
+}
+
 impl TryFrom<u8> for NbsVersion {
     type Error = u8;
 
