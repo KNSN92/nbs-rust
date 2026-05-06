@@ -52,8 +52,8 @@ impl NoteBlocks {
         self.len
     }
 
-    pub fn layer_count(&self) -> usize {
-        self.layers.len()
+    pub fn layer_count(&self) -> u16 {
+        self.layers.len() as u16
     }
 
     pub fn ticks(&self) -> &[Tick] {
