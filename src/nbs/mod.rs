@@ -1,4 +1,10 @@
-use crate::nbs::{custom_instrument::CustomInstruments, header::Header, noteblock::NoteBlocks};
+use std::io::Write;
+
+use crate::{
+    NbsIOError,
+    nbs::{custom_instrument::CustomInstruments, header::Header, noteblock::NoteBlocks},
+    write_nbs,
+};
 
 pub mod custom_instrument;
 pub mod header;
@@ -41,4 +47,34 @@ pub struct Nbs {
     pub header: Header,
     pub note_blocks: NoteBlocks,
     pub custom_instruments: CustomInstruments,
+}
+
+impl Nbs {
+    pub fn new() -> Self {
+        Nbs {
+            version: NbsVersion::Latest,
+            header: Header::default(),
+            note_blocks: NoteBlocks::default(),
+            custom_instruments: CustomInstruments::default(),
+        }
+    }
+
+    pub fn with_version(version: NbsVersion) -> Self {
+        Nbs {
+            version,
+            header: Header::default(),
+            note_blocks: NoteBlocks::default(),
+            custom_instruments: CustomInstruments::default(),
+        }
+    }
+
+    pub fn write(&self, writer: &mut impl Write) -> Result<(), NbsIOError> {
+        write_nbs(writer, self)
+    }
+}
+
+impl Default for Nbs {
+    fn default() -> Self {
+        Nbs::new()
+    }
 }
