@@ -2,7 +2,7 @@ mod reader;
 mod writer;
 
 pub use reader::{read_header, read_nbs};
-pub use writer::NbsWriter;
+pub use writer::write_nbs;
 
 #[derive(Debug, thiserror::Error)]
 pub enum NbsIOError {
@@ -33,6 +33,21 @@ macro_rules! nbsver_required {
             $newer
         } else {
             $older
+        }
+    };
+    ($version: ident = $required: ident, $newer: expr) => {
+        if $version == $crate::nbs::NbsVersion::$required {
+            $newer
+        }
+    };
+    ($version: ident > $required: ident, $newer: expr) => {
+        if $version > $crate::nbs::NbsVersion::$required {
+            $newer
+        }
+    };
+    ($version: ident >= $required: ident, $newer: expr) => {
+        if $version >= $crate::nbs::NbsVersion::$required {
+            $newer
         }
     };
 }
