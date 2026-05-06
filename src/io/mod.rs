@@ -12,7 +12,6 @@ pub enum NbsIOError {
     UnsupportedVersion(u8),
 }
 
-#[macro_export(local_inner_macros)]
 macro_rules! nbsver_required {
     ($version: ident = $required: ident, $newer: expr, $older: expr) => {
         if $version == $crate::nbs::NbsVersion::$required {
@@ -51,3 +50,5 @@ macro_rules! nbsver_required {
         }
     };
 }
+
+pub(crate) use nbsver_required;
