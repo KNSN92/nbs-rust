@@ -23,17 +23,17 @@ impl Default for Note {
     }
 }
 
-pub type Layer = u16;
-pub type NotesInTick = Vec<(Layer, Note)>;
+pub type LayerId = u16;
+pub type NotesInTick = Vec<(LayerId, Note)>;
 pub type NotesInLayer = Vec<(Tick, Note)>;
 
 #[derive(Debug)]
 pub struct NoteBlocks {
     len: Tick,
     ticks: Vec<Tick>,
-    layers: Vec<LayerMetadata>,
+    layers: Vec<Layer>,
     by_tick_notes: HashMap<Tick, NotesInTick>,
-    by_layer_notes: HashMap<Layer, NotesInLayer>,
+    by_layer_notes: HashMap<LayerId, NotesInLayer>,
 }
 
 impl NoteBlocks {
@@ -59,23 +59,23 @@ impl NoteBlocks {
         &self.ticks
     }
 
-    pub fn layers(&self) -> &[LayerMetadata] {
+    pub fn layers(&self) -> &[Layer] {
         &self.layers
     }
 
-    pub(crate) fn extend_layers(&mut self, layer_count: Layer) {
+    pub(crate) fn extend_layers(&mut self, layer_count: u16) {
         while self.layers.len() < layer_count as usize {
             self.by_layer_notes
-                .insert(self.layers.len() as Layer, vec![]);
-            self.layers.push(LayerMetadata::default());
+                .insert(self.layers.len() as LayerId, vec![]);
+            self.layers.push(Layer::default());
         }
     }
 
-    pub fn layer(&self, layer: Layer) -> Option<&LayerMetadata> {
+    pub fn layer(&self, layer: LayerId) -> Option<&Layer> {
         self.layers.get(layer as usize)
     }
 
-    pub fn layer_mut(&mut self, layer: Layer) -> Option<&mut LayerMetadata> {
+    pub fn layer_mut(&mut self, layer: LayerId) -> Option<&mut Layer> {
         self.layers.get_mut(layer as usize)
     }
 
@@ -83,11 +83,11 @@ impl NoteBlocks {
         self.by_tick_notes.get(&tick)
     }
 
-    pub fn notes_at_layer(&self, layer: Layer) -> Option<&NotesInLayer> {
+    pub fn notes_at_layer(&self, layer: LayerId) -> Option<&NotesInLayer> {
         self.by_layer_notes.get(&layer)
     }
 
-    pub fn note_at(&self, tick: Tick, layer: Layer) -> Option<&Note> {
+    pub fn note_at(&self, tick: Tick, layer: LayerId) -> Option<&Note> {
         self.by_tick_notes.get(&tick).and_then(|notes_in_tick| {
             notes_in_tick
                 .iter()
@@ -96,7 +96,7 @@ impl NoteBlocks {
         })
     }
 
-    pub fn place_note(&mut self, tick: Tick, layer: Layer, note: Note) {
+    pub fn place_note(&mut self, tick: Tick, layer: LayerId, note: Note) {
         self.len = self.len.max(tick);
 
         let notes = self.by_tick_notes.entry(tick).or_default();
@@ -121,7 +121,7 @@ impl NoteBlocks {
         &self.by_tick_notes
     }
 
-    pub fn inner_layer_notes(&self) -> &HashMap<Layer, NotesInLayer> {
+    pub fn inner_layer_notes(&self) -> &HashMap<LayerId, NotesInLayer> {
         &self.by_layer_notes
     }
 }
@@ -133,16 +133,16 @@ impl Default for NoteBlocks {
 }
 
 #[derive(Debug)]
-pub struct LayerMetadata {
+pub struct Layer {
     pub name: String,
     pub lock: bool,
     pub volume: u8,
     pub panning: u8,
 }
 
-impl Default for LayerMetadata {
+impl Default for Layer {
     fn default() -> Self {
-        LayerMetadata {
+        Layer {
             name: String::new(),
             lock: false,
             volume: 100,
