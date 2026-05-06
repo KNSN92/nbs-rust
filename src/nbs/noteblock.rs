@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::instrument::Instrument;
+use crate::{Tick, instrument::Instrument};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Note {
@@ -23,7 +23,6 @@ impl Default for Note {
     }
 }
 
-pub type Tick = u32;
 pub type Layer = u16;
 pub type NotesInTick = Vec<(Layer, Note)>;
 pub type NotesInLayer = Vec<(Tick, Note)>;
