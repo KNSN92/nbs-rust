@@ -64,10 +64,6 @@ impl NoteBlocks {
         &self.layers
     }
 
-    pub(crate) fn into_layers(self) -> Vec<LayerMetadata> {
-        self.layers
-    }
-
     pub(crate) fn extend_layers(&mut self, layer: Layer) {
         while self.layers.len() <= layer as usize {
             self.by_layer_notes
