@@ -46,7 +46,7 @@ pub struct Nbs {
     pub version: NbsVersion,
     pub header: Header,
     pub note_blocks: NoteBlocks,
-    pub custom_instruments: InstrumentSet,
+    pub instrument_set: InstrumentSet,
 }
 
 impl Nbs {
@@ -55,7 +55,7 @@ impl Nbs {
             version: NbsVersion::Latest,
             header: Header::default(),
             note_blocks: NoteBlocks::default(),
-            custom_instruments: InstrumentSet::default(),
+            instrument_set: InstrumentSet::default(),
         }
     }
 
@@ -64,7 +64,7 @@ impl Nbs {
             version,
             header: Header::default(),
             note_blocks: NoteBlocks::default(),
-            custom_instruments: InstrumentSet::default(),
+            instrument_set: InstrumentSet::default(),
         }
     }
 

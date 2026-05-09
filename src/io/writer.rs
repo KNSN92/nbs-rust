@@ -32,7 +32,7 @@ fn write_nbs_trusted_header(writer: &mut impl Write, nbs: &Nbs) -> Result<(), Nb
     let version = nbs.version;
     write_header(writer, version, nbs, true)?;
     write_note_blocks_and_layers(writer, version, &nbs.note_blocks)?;
-    write_custom_instruments(writer, &nbs.custom_instruments)?;
+    write_custom_instruments(writer, &nbs.instrument_set)?;
     Ok(())
 }
 
@@ -41,7 +41,7 @@ pub fn write_nbs(writer: &mut impl Write, nbs: &Nbs) -> Result<(), NbsIOError> {
     let version = nbs.version;
     write_header(writer, version, nbs, false)?;
     write_note_blocks_and_layers(writer, version, &nbs.note_blocks)?;
-    write_custom_instruments(writer, &nbs.custom_instruments)?;
+    write_custom_instruments(writer, &nbs.instrument_set)?;
     Ok(())
 }
 
@@ -55,7 +55,7 @@ fn write_header(
     let vanilla_instruments = if trusted {
         header.song_meta.vanilla_instruments
     } else {
-        nbs.custom_instruments.vanilla_instrument_count()
+        nbs.instrument_set.vanilla_instrument_count()
     };
     let song_length = if trusted {
         header.song_meta.length
@@ -139,10 +139,10 @@ fn write_note_blocks_and_layers(
 
 fn write_custom_instruments(
     writer: &mut impl Write,
-    custom_instruments: &InstrumentSet,
+    instrument_set: &InstrumentSet,
 ) -> Result<(), NbsIOError> {
-    writer.write_u8(custom_instruments.custom_instrument_count())?;
-    for custom_instrument in custom_instruments.as_slice() {
+    writer.write_u8(instrument_set.custom_instrument_count())?;
+    for custom_instrument in instrument_set.as_slice() {
         writer.write_string_len_i32::<LittleEndian>(&custom_instrument.name)?;
         writer.write_string_len_i32::<LittleEndian>(&custom_instrument.file_name)?;
         writer.write_u8(custom_instrument.key)?;

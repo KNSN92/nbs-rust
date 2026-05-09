@@ -33,12 +33,12 @@ pub fn read_nbs(reader: &mut impl Read) -> Result<Nbs, NbsIOError> {
     let note_blocks = NoteBlocks::new();
     let note_blocks = read_note_blocks(reader, version, note_blocks)?;
     let note_blocks = read_layers(reader, version, header.song_meta.layers, note_blocks)?;
-    let custom_instruments = read_custom_instruments(reader, header.song_meta.vanilla_instruments)?;
+    let instrument_set = read_custom_instruments(reader, header.song_meta.vanilla_instruments)?;
     Ok(Nbs {
         version,
         header,
         note_blocks,
-        custom_instruments,
+        instrument_set,
     })
 }
 
@@ -156,12 +156,12 @@ fn read_custom_instruments(
     reader: &mut impl Read,
     vanilla_instruments: u8,
 ) -> Result<InstrumentSet, NbsIOError> {
-    let mut custom_instruments = InstrumentSet::new(vanilla_instruments);
+    let mut instrument_set = InstrumentSet::new(vanilla_instruments);
     let custom_instrument_count = match reader.read_u8() {
         Ok(count) => count,
         // No custom instruments part, just return early
         Err(e) if e.kind() == ErrorKind::UnexpectedEof => {
-            return Ok(custom_instruments);
+            return Ok(instrument_set);
         }
         Err(e) => return Err(e.into()),
     };
@@ -172,7 +172,7 @@ fn read_custom_instruments(
             key: reader.read_u8()?,
             press_piano_key: reader.read_u8()? != 0,
         };
-        custom_instruments.push(custom_instrument).unwrap();
+        instrument_set.push(custom_instrument).unwrap();
     }
-    Ok(custom_instruments)
+    Ok(instrument_set)
 }
