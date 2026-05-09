@@ -1,14 +1,14 @@
 use std::io::Write;
 
-use crate::{
-    NbsIOError,
-    nbs::{custom_instrument::CustomInstruments, header::Header, noteblock::NoteBlocks},
-    write_nbs,
-};
+use crate::{NbsIOError, write_nbs};
 
-pub mod custom_instrument;
-pub mod header;
-pub mod noteblock;
+mod custom_instrument;
+mod header;
+mod noteblock;
+
+pub use custom_instrument::*;
+pub use header::*;
+pub use noteblock::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum NbsVersion {
@@ -46,7 +46,7 @@ pub struct Nbs {
     pub version: NbsVersion,
     pub header: Header,
     pub note_blocks: NoteBlocks,
-    pub custom_instruments: CustomInstruments,
+    pub custom_instruments: InstrumentSet,
 }
 
 impl Nbs {
@@ -55,7 +55,7 @@ impl Nbs {
             version: NbsVersion::Latest,
             header: Header::default(),
             note_blocks: NoteBlocks::default(),
-            custom_instruments: CustomInstruments::default(),
+            custom_instruments: InstrumentSet::default(),
         }
     }
 
@@ -64,7 +64,7 @@ impl Nbs {
             version,
             header: Header::default(),
             note_blocks: NoteBlocks::default(),
-            custom_instruments: CustomInstruments::default(),
+            custom_instruments: InstrumentSet::default(),
         }
     }
 

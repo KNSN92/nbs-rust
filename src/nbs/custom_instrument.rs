@@ -20,15 +20,15 @@ impl Default for CustomInstrument {
 }
 
 #[derive(Debug)]
-pub struct CustomInstruments {
-    instruments: Vec<CustomInstrument>,
+pub struct InstrumentSet {
+    custom_instruments: Vec<CustomInstrument>,
     vanilla_instruments: u8,
 }
 
-impl CustomInstruments {
+impl InstrumentSet {
     pub fn new(vanilla_instruments: u8) -> Self {
-        CustomInstruments {
-            instruments: vec![],
+        InstrumentSet {
+            custom_instruments: vec![],
             vanilla_instruments,
         }
     }
@@ -42,7 +42,7 @@ impl CustomInstruments {
     pub fn get(&self, instrument: Instrument) -> Option<&CustomInstrument> {
         match instrument {
             Instrument(id) if id >= self.vanilla_instruments => self
-                .instruments
+                .custom_instruments
                 .get((id - self.vanilla_instruments) as usize),
             _ => None,
         }
@@ -51,41 +51,41 @@ impl CustomInstruments {
     pub fn get_mut(&mut self, instrument: Instrument) -> Option<&mut CustomInstrument> {
         match instrument {
             Instrument(id) if id >= self.vanilla_instruments => self
-                .instruments
+                .custom_instruments
                 .get_mut((id - self.vanilla_instruments) as usize),
             _ => None,
         }
     }
 
     pub fn push(&mut self, custom_instrument: CustomInstrument) -> Result<(), CustomInstrument> {
-        if self.instruments.len() + self.vanilla_instruments as usize >= 256 {
+        if self.custom_instruments.len() + self.vanilla_instruments as usize >= 256 {
             return Err(custom_instrument);
         }
-        self.instruments.push(custom_instrument);
+        self.custom_instruments.push(custom_instrument);
         Ok(())
     }
 
-    pub fn instruments(&self) -> &[CustomInstrument] {
-        &self.instruments
+    pub fn as_slice(&self) -> &[CustomInstrument] {
+        &self.custom_instruments
     }
 
-    pub fn instruments_mut(&mut self) -> &mut [CustomInstrument] {
-        &mut self.instruments
+    pub fn as_slice_mut(&mut self) -> &mut [CustomInstrument] {
+        &mut self.custom_instruments
     }
 
     pub fn vanilla_instrument_count(&self) -> u8 {
         self.vanilla_instruments
     }
 
-    pub fn count(&self) -> u8 {
-        self.instruments.len() as u8
+    pub fn custom_instrument_count(&self) -> u8 {
+        self.custom_instruments.len() as u8
     }
 }
 
-impl Default for CustomInstruments {
+impl Default for InstrumentSet {
     fn default() -> Self {
-        CustomInstruments {
-            instruments: vec![],
+        InstrumentSet {
+            custom_instruments: vec![],
             vanilla_instruments: VANILLA_INSTRUMENT_COUNT,
         }
     }

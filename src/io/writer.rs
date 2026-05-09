@@ -4,7 +4,7 @@ use byteorder::{LittleEndian, WriteBytesExt};
 
 use crate::{
     Nbs, NbsIOError,
-    nbs::{NbsVersion, custom_instrument::CustomInstruments, noteblock::NoteBlocks},
+    nbs::{InstrumentSet, NbsVersion, NoteBlocks},
     nbsver_required,
 };
 
@@ -139,10 +139,10 @@ fn write_note_blocks_and_layers(
 
 fn write_custom_instruments(
     writer: &mut impl Write,
-    custom_instruments: &CustomInstruments,
+    custom_instruments: &InstrumentSet,
 ) -> Result<(), NbsIOError> {
-    writer.write_u8(custom_instruments.count())?;
-    for custom_instrument in custom_instruments.instruments() {
+    writer.write_u8(custom_instruments.custom_instrument_count())?;
+    for custom_instrument in custom_instruments.as_slice() {
         writer.write_string_len_i32::<LittleEndian>(&custom_instrument.name)?;
         writer.write_string_len_i32::<LittleEndian>(&custom_instrument.file_name)?;
         writer.write_u8(custom_instrument.key)?;

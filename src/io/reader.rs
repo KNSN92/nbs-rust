@@ -8,12 +8,7 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use crate::{
     instrument::Instrument,
     io::NbsIOError,
-    nbs::{
-        Nbs, NbsVersion,
-        custom_instrument::{CustomInstrument, CustomInstruments},
-        header::{Header, Looping},
-        noteblock::{Note, NoteBlocks},
-    },
+    nbs::{CustomInstrument, Header, InstrumentSet, Looping, Nbs, NbsVersion, Note, NoteBlocks},
     nbsver_required,
 };
 
@@ -160,8 +155,8 @@ fn read_layers(
 fn read_custom_instruments(
     reader: &mut impl Read,
     vanilla_instruments: u8,
-) -> Result<CustomInstruments, NbsIOError> {
-    let mut custom_instruments = CustomInstruments::new(vanilla_instruments);
+) -> Result<InstrumentSet, NbsIOError> {
+    let mut custom_instruments = InstrumentSet::new(vanilla_instruments);
     let custom_instrument_count = match reader.read_u8() {
         Ok(count) => count,
         // No custom instruments part, just return early
