@@ -28,6 +28,11 @@ pub trait ReadStringExt: byteorder::ReadBytesExt {
 
 impl<R: ReadBytesExt + ?Sized> ReadStringExt for R {}
 
+/// Reads an NBS format from the given reader and returns an Nbs struct.
+/// ```rust
+/// let mut reader = Cursor::new(include_bytes!("./songs/foobar.nbs").to_vec());
+/// let mut nbs = read_nbs(&mut reader)?;
+/// ```
 pub fn read_nbs(reader: &mut impl Read) -> Result<Nbs, NbsIOError> {
     let (version, header) = read_header(reader)?;
     let note_blocks = NoteBlocks::new();
@@ -42,6 +47,12 @@ pub fn read_nbs(reader: &mut impl Read) -> Result<Nbs, NbsIOError> {
     })
 }
 
+/// Reads only the header of an NBS format from the given reader and returns it.
+/// This function is useful when you only want to get the metadata.
+/// ```rust
+/// let mut reader = Cursor::new(include_bytes!("./songs/foobar.nbs").to_vec());
+/// let mut (version, header) = read_header(&mut reader)?;
+/// ```
 pub fn read_header(reader: &mut impl Read) -> Result<(NbsVersion, Header), NbsIOError> {
     let mut header = Header::default();
 
