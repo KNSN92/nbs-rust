@@ -15,7 +15,7 @@ impl Default for Note {
     fn default() -> Self {
         Note {
             instrument: Instrument::Harp,
-            key: 0,
+            key: 45,
             volume: 100,
             panning: 0,
             pitch: 0,
