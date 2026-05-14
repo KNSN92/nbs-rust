@@ -69,16 +69,16 @@ pub fn read_header(reader: &mut impl Read) -> Result<(NbsVersion, Header), NbsIO
     header.song_info.original_author = reader.read_string_len_i32::<LittleEndian>()?;
     header.song_info.description = reader.read_string_len_i32::<LittleEndian>()?;
     header.song_meta.tempo = reader.read_i16::<LittleEndian>()? as f32 / 100.0;
-    header.auto_saving.enabled = reader.read_u8()? != 0;
-    header.auto_saving.duration = reader.read_u8()?;
-    header.song_meta.time_signature = reader.read_u8()?;
+    header.editor_info.auto_saving.enabled = reader.read_u8()? != 0;
+    header.editor_info.auto_saving.duration = reader.read_u8()?;
+    header.editor_info.time_signature = reader.read_u8()?;
     header.song_stats.minutes_spent = reader.read_u32::<LittleEndian>()?;
     header.song_stats.left_clicks = reader.read_u32::<LittleEndian>()?;
     header.song_stats.right_clicks = reader.read_u32::<LittleEndian>()?;
     header.song_stats.note_blocks_added = reader.read_u32::<LittleEndian>()?;
     header.song_stats.note_blocks_removed = reader.read_u32::<LittleEndian>()?;
-    header.midi_schematic_file_name = reader.read_string_len_i32::<LittleEndian>()?;
-    header.looping = nbsver_required!(
+    header.editor_info.midi_schematic_file_name = reader.read_string_len_i32::<LittleEndian>()?;
+    header.song_meta.looping = nbsver_required!(
         version >= V4,
         Looping {
             enabled: reader.read_u8()? != 0,

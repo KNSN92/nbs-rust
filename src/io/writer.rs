@@ -88,19 +88,19 @@ fn write_header(
     writer.write_string_len_i32::<LittleEndian>(&header.song_info.original_author)?;
     writer.write_string_len_i32::<LittleEndian>(&header.song_info.description)?;
     writer.write_u16::<LittleEndian>((header.song_meta.tempo * 100.0) as u16)?;
-    writer.write_u8(header.auto_saving.enabled.into())?;
-    writer.write_u8(header.auto_saving.duration)?;
-    writer.write_u8(header.song_meta.time_signature)?;
+    writer.write_u8(header.editor_info.auto_saving.enabled.into())?;
+    writer.write_u8(header.editor_info.auto_saving.duration)?;
+    writer.write_u8(header.editor_info.time_signature)?;
     writer.write_u32::<LittleEndian>(header.song_stats.minutes_spent)?;
     writer.write_u32::<LittleEndian>(header.song_stats.left_clicks)?;
     writer.write_u32::<LittleEndian>(header.song_stats.right_clicks)?;
     writer.write_u32::<LittleEndian>(header.song_stats.note_blocks_added)?;
     writer.write_u32::<LittleEndian>(header.song_stats.note_blocks_removed)?;
-    writer.write_string_len_i32::<LittleEndian>(&header.midi_schematic_file_name)?;
+    writer.write_string_len_i32::<LittleEndian>(&header.editor_info.midi_schematic_file_name)?;
     nbsver_required!(version >= V4, {
-        writer.write_u8(header.looping.enabled.into())?;
-        writer.write_u8(header.looping.count.map(|c| c.get()).unwrap_or(0))?;
-        writer.write_u16::<LittleEndian>(header.looping.start_tick)?;
+        writer.write_u8(header.song_meta.looping.enabled.into())?;
+        writer.write_u8(header.song_meta.looping.count.map(|c| c.get()).unwrap_or(0))?;
+        writer.write_u16::<LittleEndian>(header.song_meta.looping.start_tick)?;
     });
     Ok(())
 }

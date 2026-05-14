@@ -1,12 +1,12 @@
 use std::num::NonZeroU8;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct SongMetadata {
     pub vanilla_instruments: u8,
     pub length: u16,
     pub layers: u16,
     pub tempo: f32,
-    pub time_signature: u8,
+    pub looping: Looping,
 }
 
 #[derive(Debug)]
@@ -27,6 +27,13 @@ pub struct SongStats {
 }
 
 #[derive(Debug)]
+pub struct EditorInfo {
+    pub time_signature: u8,
+    pub auto_saving: AutoSaving,
+    pub midi_schematic_file_name: String,
+}
+
+#[derive(Debug)]
 pub struct Looping {
     pub enabled: bool,
     pub count: Option<NonZeroU8>,
@@ -44,9 +51,7 @@ pub struct Header {
     pub song_meta: SongMetadata,
     pub song_info: SongInfo,
     pub song_stats: SongStats,
-    pub auto_saving: AutoSaving,
-    pub looping: Looping,
-    pub midi_schematic_file_name: String,
+    pub editor_info: EditorInfo,
 }
 
 impl Default for Header {
@@ -57,7 +62,11 @@ impl Default for Header {
                 length: 0,
                 layers: 0,
                 tempo: 10.0,
-                time_signature: 4,
+                looping: Looping {
+                    enabled: false,
+                    count: None,
+                    start_tick: 0,
+                },
             },
             song_info: SongInfo {
                 name: "".to_string(),
@@ -72,16 +81,14 @@ impl Default for Header {
                 note_blocks_added: 0,
                 note_blocks_removed: 0,
             },
-            auto_saving: AutoSaving {
-                enabled: false,
-                duration: 10,
+            editor_info: EditorInfo {
+                time_signature: 4,
+                auto_saving: AutoSaving {
+                    enabled: false,
+                    duration: 10,
+                },
+                midi_schematic_file_name: "".to_string(),
             },
-            looping: Looping {
-                enabled: false,
-                count: None,
-                start_tick: 0,
-            },
-            midi_schematic_file_name: "".to_string(),
         }
     }
 }
