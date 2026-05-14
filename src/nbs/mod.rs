@@ -1,6 +1,10 @@
-use std::io::Write;
+use std::{
+    fs::File,
+    io::{Read, Write},
+    path::Path,
+};
 
-use crate::{NbsIOError, write_nbs};
+use crate::{NbsIOError, read_nbs, write_nbs};
 
 mod custom_instrument;
 mod header;
@@ -68,8 +72,22 @@ impl Nbs {
         }
     }
 
+    pub fn read(reader: &mut impl Read) -> Result<Self, NbsIOError> {
+        read_nbs(reader)
+    }
+
+    pub fn open(path: impl AsRef<Path>) -> Result<Self, NbsIOError> {
+        let mut file = File::open(path)?;
+        read_nbs(&mut file)
+    }
+
     pub fn write(&self, writer: &mut impl Write) -> Result<(), NbsIOError> {
         write_nbs(writer, self)
+    }
+
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<(), NbsIOError> {
+        let mut file = File::create(path)?;
+        write_nbs(&mut file, self)
     }
 }
 
