@@ -1,5 +1,7 @@
 mod reader;
 mod writer;
+#[cfg(feature = "zip")]
+mod zip;
 
 pub use reader::{read_header, read_nbs};
 pub use writer::write_nbs;
