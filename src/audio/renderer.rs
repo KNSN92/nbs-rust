@@ -129,15 +129,16 @@ impl<P: InstrumentAudioProvider + Send> Iterator for NbsAudioRenderer<P> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.samples_until_next_tick == 0 {
-            let looping = &self.nbs.header.song_meta.looping;
             if self.tick >= self.nbs.note_blocks.ticks_len() {
+                let looping = &self.nbs.header.song_meta.looping;
                 if looping.enabled {
                     match looping.count {
                         Some(count) if self.loop_count < count.get() => {
                             self.loop_count += 1;
                             self.seek_to_tick(looping.start_tick as u32);
                         }
-                        Some(_) => return None,
+                        Some(_) if self.playing_sounds.is_empty() => return None,
+                        Some(_) => {}
                         None => self.seek_to_tick(looping.start_tick as u32),
                     }
                 } else {
