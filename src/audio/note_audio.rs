@@ -8,7 +8,7 @@ use rubato::{
 use crate::{
     audio::{Float, Frame, InstrumentAudio, InstrumentAudioProvider, Sample, SampleRate},
     instrument::CustomInstrument,
-    nbs::{Layer, Note},
+    noteblock::{Layer, Note},
 };
 
 pub struct NoteAudio {

@@ -4,13 +4,10 @@ use std::{
     path::Path,
 };
 
-use crate::{NbsIOError, instrument::InstrumentSet, read_nbs, write_nbs};
-
-mod header;
-mod noteblock;
-
-pub use header::*;
-pub use noteblock::*;
+use crate::{
+    NbsIOError, header::Header, instrument::InstrumentSet, noteblock::NoteBlocks, read_nbs,
+    write_nbs,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum NbsVersion {
