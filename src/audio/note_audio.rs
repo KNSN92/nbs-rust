@@ -24,7 +24,7 @@ impl NoteAudio {
         note: &Note,
         layer: Option<&Layer>,
         custom_instrument: Option<&CustomInstrument>,
-        provider: &impl InstrumentAudioProvider,
+        provider: &dyn InstrumentAudioProvider,
         sample_rate: SampleRate,
     ) -> Option<Self> {
         let audio = provider.get_audio(note.instrument)?;
