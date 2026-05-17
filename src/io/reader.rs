@@ -117,7 +117,7 @@ fn read_note_blocks(
                 instrument: Instrument(reader.read_u8()?),
                 key: reader.read_u8()?,
                 volume: nbsver_required!(version >= V4, reader.read_u8()?, 100),
-                panning: nbsver_required!(version >= V4, reader.read_u8()?, 0),
+                panning: nbsver_required!(version >= V4, reader.read_u8()?, 100),
                 pitch: nbsver_required!(version >= V4, reader.read_i16::<LittleEndian>()?, 0),
             };
             note_blocks.place_note(tick, layer, note);
