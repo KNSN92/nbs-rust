@@ -3,8 +3,7 @@ use std::{fs::File, path::Path};
 use crate::{
     Instrument,
     audio::{InstrumentAudio, decoder::decode_audio_from_file, vanilla_audio::VANILLA_AUDIOS},
-    instrument::VANILLA_INSTRUMENT_COUNT,
-    nbs::InstrumentSet,
+    instrument::{InstrumentSet, VANILLA_INSTRUMENT_COUNT},
 };
 
 pub trait InstrumentAudioProvider {

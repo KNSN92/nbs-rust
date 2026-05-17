@@ -4,13 +4,11 @@ use std::{
     path::Path,
 };
 
-use crate::{NbsIOError, read_nbs, write_nbs};
+use crate::{NbsIOError, instrument::InstrumentSet, read_nbs, write_nbs};
 
-mod custom_instrument;
 mod header;
 mod noteblock;
 
-pub use custom_instrument::*;
 pub use header::*;
 pub use noteblock::*;
 
