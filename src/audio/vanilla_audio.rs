@@ -1,12 +1,9 @@
 use std::sync::LazyLock;
 
-use crate::{
-    audio::{InstrumentAudio, decoder::decode_audio_from_bytes},
-    instrument::VANILLA_INSTRUMENT_COUNT,
-};
+use crate::{audio::InstrumentAudio, instrument::VANILLA_INSTRUMENT_COUNT};
 
 fn decode_vorbis(vorbis_bin: &'static [u8]) -> InstrumentAudio {
-    decode_audio_from_bytes(vorbis_bin, Some("ogg")).unwrap()
+    InstrumentAudio::from_bytes(vorbis_bin, Some("ogg")).unwrap()
 }
 
 macro_rules! audio {

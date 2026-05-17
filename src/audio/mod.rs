@@ -7,7 +7,6 @@ mod vanilla_audio;
 
 use std::num::{NonZeroU16, NonZeroU32};
 
-pub use decoder::*;
 pub use instrument_audio::InstrumentAudio;
 pub use note_audio::NoteAudio;
 pub use renderer::NbsAudioRenderer;

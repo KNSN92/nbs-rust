@@ -2,7 +2,7 @@ use std::{fs::File, path::Path};
 
 use crate::{
     Instrument,
-    audio::{InstrumentAudio, decoder::decode_audio_from_file, vanilla_audio::VANILLA_AUDIOS},
+    audio::{InstrumentAudio, vanilla_audio::VANILLA_AUDIOS},
     instrument::{InstrumentSet, VANILLA_INSTRUMENT_COUNT},
 };
 
@@ -57,7 +57,7 @@ impl FileAudioProvider {
             let path = dir.as_ref().join(&ci.file_name);
             let audio = File::open(path)
                 .ok()
-                .and_then(|file| decode_audio_from_file(file, None).ok());
+                .and_then(|file| InstrumentAudio::from_file(file, None).ok());
             #[cfg(debug_assertions)]
             if audio.is_none() {
                 eprintln!(
