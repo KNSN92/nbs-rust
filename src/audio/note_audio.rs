@@ -6,7 +6,7 @@ use rubato::{
 };
 
 use crate::{
-    audio::{Float, Frame, InstrumentAudio, InstrumentAudioProvider, Sample, SampleRate},
+    audio::{Float, Frame, InstrumentAudio, Sample, SampleRate, provider::InstrumentAudioProvider},
     instrument::CustomInstrument,
     noteblock::{Layer, Note},
 };

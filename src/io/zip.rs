@@ -1,5 +1,5 @@
 #[cfg(feature = "audio")]
-use crate::audio::FileAudioProvider;
+use crate::audio::provider::FileAudioProvider;
 use crate::{Nbs, io::NbsIOError};
 
 #[cfg(not(feature = "audio"))]

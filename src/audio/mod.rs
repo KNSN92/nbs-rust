@@ -1,7 +1,7 @@
 mod decoder;
 mod instrument_audio;
 mod note_audio;
-mod provider;
+pub mod provider;
 mod renderer;
 mod vanilla_audio;
 
@@ -10,7 +10,6 @@ use std::num::{NonZeroU16, NonZeroU32};
 pub use decoder::*;
 pub use instrument_audio::InstrumentAudio;
 pub use note_audio::NoteAudio;
-pub use provider::*;
 pub use renderer::NbsAudioRenderer;
 
 pub type Float = f32;
