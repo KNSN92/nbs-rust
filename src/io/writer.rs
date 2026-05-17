@@ -3,10 +3,8 @@ use std::io::Write;
 use byteorder::{LittleEndian, WriteBytesExt};
 
 use crate::{
-    Nbs, NbsIOError,
-    instrument::InstrumentSet,
-    nbs::{NbsVersion, NoteBlocks},
-    nbsver_required,
+    Nbs, NbsIOError, instrument::InstrumentSet, nbs::NbsVersion, nbsver_required,
+    noteblock::NoteBlocks,
 };
 
 pub trait WriteStringExt: byteorder::WriteBytesExt {

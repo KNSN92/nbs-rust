@@ -6,10 +6,12 @@ use std::{
 use byteorder::{LittleEndian, ReadBytesExt};
 
 use crate::{
+    Nbs, NbsVersion,
+    header::{Header, Looping},
     instrument::{CustomInstrument, Instrument, InstrumentSet},
     io::NbsIOError,
-    nbs::{Header, Looping, Nbs, NbsVersion, Note, NoteBlocks},
     nbsver_required,
+    noteblock::{Note, NoteBlocks},
 };
 
 pub trait ReadStringExt: byteorder::ReadBytesExt {

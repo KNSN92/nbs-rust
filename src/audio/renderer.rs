@@ -7,7 +7,7 @@ use crate::{
     audio::{
         Frame, NoteAudio, SampleRate, VanillaAudioProvider, provider::InstrumentAudioProvider,
     },
-    nbs::{LayerId, Note},
+    noteblock::{LayerId, Note},
 };
 
 pub struct NbsAudioRenderer<P: InstrumentAudioProvider + Send> {
