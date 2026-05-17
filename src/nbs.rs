@@ -5,8 +5,10 @@ use std::{
 };
 
 use crate::{
-    NbsIOError, header::Header, instrument::InstrumentSet, noteblock::NoteBlocks, read_nbs,
-    write_nbs,
+    header::Header,
+    instrument::InstrumentSet,
+    io::{NbsIOError, read_nbs, write_nbs},
+    noteblock::NoteBlocks,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

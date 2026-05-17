@@ -3,7 +3,10 @@ use std::io::Write;
 use byteorder::{LittleEndian, WriteBytesExt};
 
 use crate::{
-    Nbs, NbsIOError, instrument::InstrumentSet, nbs::NbsVersion, nbsver_required,
+    Nbs,
+    instrument::InstrumentSet,
+    io::{NbsIOError, nbsver_required},
+    nbs::NbsVersion,
     noteblock::NoteBlocks,
 };
 

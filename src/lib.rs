@@ -2,12 +2,11 @@
 pub mod audio;
 pub mod header;
 mod instrument;
-mod io;
+pub mod io;
 mod nbs;
 pub mod noteblock;
 
 pub use instrument::Instrument;
-pub use io::*;
 pub use nbs::*;
 
 pub type Tick = u32;
