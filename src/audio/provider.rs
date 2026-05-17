@@ -3,7 +3,7 @@ use std::{fs::File, path::Path};
 use crate::{
     Instrument,
     audio::{InstrumentAudio, vanilla_audio::VANILLA_AUDIOS},
-    instrument::{InstrumentSet, VANILLA_INSTRUMENT_COUNT},
+    instrument::{CustomInstrument, InstrumentSet, VANILLA_INSTRUMENT_COUNT},
 };
 
 pub trait InstrumentAudioProvider {
@@ -50,27 +50,28 @@ impl FileAudioProvider {
         dir: impl AsRef<Path>,
         instrument_set: &InstrumentSet,
         vanilla_instruments: u8,
-    ) -> Self {
+    ) -> (Self, Vec<&CustomInstrument>) {
         let mut custom_instrument_audios =
+            Vec::with_capacity(instrument_set.custom_instrument_count() as usize);
+        let mut failed_custom_instruments =
             Vec::with_capacity(instrument_set.custom_instrument_count() as usize);
         for ci in instrument_set.as_slice() {
             let path = dir.as_ref().join(&ci.file_name);
             let audio = File::open(path)
                 .ok()
                 .and_then(|file| InstrumentAudio::from_file(file, None).ok());
-            #[cfg(debug_assertions)]
             if audio.is_none() {
-                eprintln!(
-                    "Warning: Failed to load audio for custom instrument '{}' from file '{}'",
-                    ci.name, ci.file_name
-                );
+                failed_custom_instruments.push(ci);
             }
             custom_instrument_audios.push(audio);
         }
-        FileAudioProvider {
-            vanilla_instruments,
-            custom_instrument_audios,
-        }
+        (
+            FileAudioProvider {
+                vanilla_instruments,
+                custom_instrument_audios,
+            },
+            failed_custom_instruments,
+        )
     }
 
     #[allow(dead_code, unused)]
