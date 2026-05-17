@@ -3,7 +3,7 @@ use std::{fs::File, path::Path};
 use crate::{
     Instrument,
     audio::{InstrumentAudio, vanilla_audio::VANILLA_AUDIOS},
-    instrument::{CustomInstrument, InstrumentSet, VANILLA_INSTRUMENT_COUNT},
+    instrument::{CustomInstrument, InstrumentSet, TEMPO_CHANGER, VANILLA_INSTRUMENT_COUNT},
 };
 
 pub trait InstrumentAudioProvider {
@@ -56,6 +56,10 @@ impl FileAudioProvider {
         let mut failed_custom_instruments =
             Vec::with_capacity(instrument_set.custom_instrument_count() as usize);
         for ci in instrument_set.as_slice() {
+            if ci.name == TEMPO_CHANGER {
+                custom_instrument_audios.push(None);
+                continue;
+            }
             let path = dir.as_ref().join(&ci.file_name);
             let audio = File::open(path)
                 .ok()
