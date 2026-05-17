@@ -1,6 +1,9 @@
-use std::{num::NonZeroU32, sync::Arc};
+use std::{fs::File, io::Cursor, num::NonZeroU32, sync::Arc};
 
-use crate::audio::{Channels, Frame, Sample, SampleRate};
+use crate::audio::{
+    Channels, Frame, Sample, SampleRate,
+    decoder::{DecodeAudioError, decode_audio},
+};
 
 #[derive(Debug)]
 pub struct InstrumentAudio {
@@ -10,6 +13,20 @@ pub struct InstrumentAudio {
 }
 
 impl InstrumentAudio {
+    pub fn from_file(
+        file: File,
+        hint_ext: Option<&str>,
+    ) -> Result<InstrumentAudio, DecodeAudioError> {
+        decode_audio(file, hint_ext)
+    }
+
+    pub fn from_bytes(
+        data: impl AsRef<[u8]> + Send + Sync + 'static,
+        hint_ext: Option<&str>,
+    ) -> Result<InstrumentAudio, DecodeAudioError> {
+        decode_audio(Cursor::new(data), hint_ext)
+    }
+
     pub fn new(
         samples: impl Into<Vec<Sample>>,
         channels: Channels,

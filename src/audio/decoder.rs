@@ -1,7 +1,4 @@
-use std::{
-    fs::File,
-    io::{self, Cursor},
-};
+use std::io;
 
 use symphonia::{
     core::{
@@ -42,21 +39,7 @@ pub enum DecodeAudioError {
     InconsistentAudioSpec,
 }
 
-pub fn decode_audio_from_file(
-    file: File,
-    hint_ext: Option<&str>,
-) -> Result<InstrumentAudio, DecodeAudioError> {
-    decode_audio(file, hint_ext)
-}
-
-pub fn decode_audio_from_bytes(
-    data: impl AsRef<[u8]> + Send + Sync + 'static,
-    hint_ext: Option<&str>,
-) -> Result<InstrumentAudio, DecodeAudioError> {
-    decode_audio(Cursor::new(data), hint_ext)
-}
-
-fn decode_audio(
+pub fn decode_audio(
     data: impl MediaSource + 'static,
     hint_ext: Option<&str>,
 ) -> Result<InstrumentAudio, DecodeAudioError> {
@@ -222,12 +205,13 @@ fn map_symphonia_error(err: Error) -> DecodeAudioError {
 
 #[cfg(test)]
 mod tests {
-    use super::decode_audio_from_bytes;
+    use crate::audio::InstrumentAudio;
 
     #[test]
     fn decodes_vanilla_ogg_audio() {
-        let audio = decode_audio_from_bytes(include_bytes!("../../audio/harp.ogg"), Some("ogg"))
-            .expect("vanilla OGG should decode");
+        let audio =
+            InstrumentAudio::from_bytes(include_bytes!("../../audio/harp.ogg"), Some("ogg"))
+                .expect("vanilla OGG should decode");
 
         assert!(audio.frame_count() > 0);
         assert!(audio.sample_rate().get() > 0);
