@@ -5,7 +5,8 @@ use lru::LruCache;
 use crate::{
     Instrument, Nbs, Tick,
     audio::{
-        Frame, NoteAudio, SampleRate, VanillaAudioProvider, provider::InstrumentAudioProvider,
+        Frame, NoteAudio, SampleRate,
+        provider::{InstrumentAudioProvider, VanillaAudioProvider},
     },
     noteblock::{LayerId, Note},
 };
