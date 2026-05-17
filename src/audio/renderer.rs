@@ -11,9 +11,9 @@ use crate::{
     noteblock::{LayerId, Note},
 };
 
-pub struct NbsAudioRenderer<P: InstrumentAudioProvider + Send> {
+pub struct NbsAudioRenderer {
     nbs: Nbs,
-    audio_provider: P,
+    audio_provider: Box<dyn InstrumentAudioProvider + Send>,
     note_cache: LruCache<(Instrument, u8, i16), NoteAudio>,
     sample_rate: SampleRate,
     tick: Tick,
@@ -51,12 +51,12 @@ fn build_tempo_mapping(nbs: &Nbs) -> Vec<(Tick, f32)> {
     tempo_mapping
 }
 
-impl NbsAudioRenderer<VanillaAudioProvider> {
-    pub fn builder(nbs: Nbs) -> NbsAudioRendererBuilder<VanillaAudioProvider> {
+impl NbsAudioRenderer {
+    pub fn builder(nbs: Nbs) -> NbsAudioRendererBuilder {
         NbsAudioRendererBuilder {
-            audio_provider: VanillaAudioProvider::new(
+            audio_provider: Box::new(VanillaAudioProvider::new(
                 nbs.instrument_set.vanilla_instrument_count(),
-            ),
+            )),
             nbs,
             cache_capacity: None,
             sample_rate: None,
@@ -64,10 +64,10 @@ impl NbsAudioRenderer<VanillaAudioProvider> {
     }
 }
 
-impl<P: InstrumentAudioProvider + Send> NbsAudioRenderer<P> {
+impl NbsAudioRenderer {
     fn new(
         nbs: Nbs,
-        audio_provider: P,
+        audio_provider: Box<dyn InstrumentAudioProvider + Send>,
         cache_capacity: NonZeroUsize,
         sample_rate: SampleRate,
     ) -> Self {
@@ -109,7 +109,7 @@ impl<P: InstrumentAudioProvider + Send> NbsAudioRenderer<P> {
                     note,
                     layer,
                     self.nbs.instrument_set.get(note.instrument),
-                    &self.audio_provider,
+                    &*self.audio_provider,
                     self.sample_rate,
                 )?;
                 let playback_audio = audio.for_note(note, layer);
@@ -125,7 +125,7 @@ impl<P: InstrumentAudioProvider + Send> NbsAudioRenderer<P> {
     }
 }
 
-impl<P: InstrumentAudioProvider + Send> Iterator for NbsAudioRenderer<P> {
+impl Iterator for NbsAudioRenderer {
     type Item = Frame;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -191,14 +191,14 @@ impl<P: InstrumentAudioProvider + Send> Iterator for NbsAudioRenderer<P> {
     }
 }
 
-pub struct NbsAudioRendererBuilder<P: InstrumentAudioProvider + Send> {
+pub struct NbsAudioRendererBuilder {
     nbs: Nbs,
-    audio_provider: P,
+    audio_provider: Box<dyn InstrumentAudioProvider + Send>,
     cache_capacity: Option<NonZeroUsize>,
     sample_rate: Option<SampleRate>,
 }
 
-impl<P: InstrumentAudioProvider + Send> NbsAudioRendererBuilder<P> {
+impl NbsAudioRendererBuilder {
     pub fn cache_capacity(mut self, capacity: NonZeroUsize) -> Self {
         self.cache_capacity = Some(capacity);
         self
@@ -209,10 +209,10 @@ impl<P: InstrumentAudioProvider + Send> NbsAudioRendererBuilder<P> {
         self
     }
 
-    pub fn audio_provider<NP: InstrumentAudioProvider + Send>(
+    pub fn audio_provider(
         self,
-        audio_provider: NP,
-    ) -> NbsAudioRendererBuilder<NP> {
+        audio_provider: Box<dyn InstrumentAudioProvider + Send>,
+    ) -> NbsAudioRendererBuilder {
         let NbsAudioRendererBuilder {
             nbs,
             cache_capacity,
@@ -227,7 +227,7 @@ impl<P: InstrumentAudioProvider + Send> NbsAudioRendererBuilder<P> {
         }
     }
 
-    pub fn build(self) -> NbsAudioRenderer<P> {
+    pub fn build(self) -> NbsAudioRenderer {
         NbsAudioRenderer::new(
             self.nbs,
             self.audio_provider,
