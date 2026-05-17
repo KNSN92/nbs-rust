@@ -6,9 +6,9 @@ use std::{
 use byteorder::{LittleEndian, ReadBytesExt};
 
 use crate::{
-    instrument::Instrument,
+    instrument::{CustomInstrument, Instrument, InstrumentSet},
     io::NbsIOError,
-    nbs::{CustomInstrument, Header, InstrumentSet, Looping, Nbs, NbsVersion, Note, NoteBlocks},
+    nbs::{Header, Looping, Nbs, NbsVersion, Note, NoteBlocks},
     nbsver_required,
 };
 

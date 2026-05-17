@@ -4,7 +4,8 @@ use byteorder::{LittleEndian, WriteBytesExt};
 
 use crate::{
     Nbs, NbsIOError,
-    nbs::{InstrumentSet, NbsVersion, NoteBlocks},
+    instrument::InstrumentSet,
+    nbs::{NbsVersion, NoteBlocks},
     nbsver_required,
 };
 
