@@ -123,6 +123,14 @@ impl InstrumentSet {
     pub fn custom_instrument_count(&self) -> u8 {
         self.custom_instruments.len() as u8
     }
+
+    pub fn instrument_count(&self) -> u8 {
+        self.vanilla_instrument_count() + self.custom_instrument_count()
+    }
+
+    pub fn has_custom_instrument(&self) -> bool {
+        !self.custom_instruments.is_empty()
+    }
 }
 
 impl Default for InstrumentSet {
