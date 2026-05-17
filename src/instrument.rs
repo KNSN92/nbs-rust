@@ -64,6 +64,8 @@ pub struct InstrumentSet {
     vanilla_instruments: u8,
 }
 
+pub const TEMPO_CHANGER: &str = "Tempo Changer";
+
 impl InstrumentSet {
     pub fn new(vanilla_instruments: u8) -> Self {
         InstrumentSet {
@@ -74,7 +76,7 @@ impl InstrumentSet {
 
     pub fn is_tempo_changer(&self, instrument: Instrument) -> bool {
         self.get(instrument)
-            .map(|ci| &ci.name == "Tempo Changer")
+            .map(|ci| &ci.name == TEMPO_CHANGER)
             .unwrap_or(false)
     }
 
