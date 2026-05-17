@@ -9,8 +9,7 @@ use crate::{
     Nbs, NbsVersion,
     header::{Header, Looping},
     instrument::{CustomInstrument, Instrument, InstrumentSet},
-    io::NbsIOError,
-    nbsver_required,
+    io::{NbsIOError, nbsver_required},
     noteblock::{Note, NoteBlocks},
 };
 

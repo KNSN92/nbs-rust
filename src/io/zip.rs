@@ -1,6 +1,6 @@
 #[cfg(feature = "audio")]
 use crate::audio::FileAudioProvider;
-use crate::{Nbs, NbsIOError};
+use crate::{Nbs, io::NbsIOError};
 
 #[cfg(not(feature = "audio"))]
 pub fn extract_nbs(zip_bytes: &[u8]) -> Result<Nbs, NbsIOError> {
