@@ -80,10 +80,6 @@ impl InstrumentSet {
             .unwrap_or(false)
     }
 
-    pub fn set_vanilla_instrument_count(&mut self, count: u8) {
-        self.vanilla_instruments = count;
-    }
-
     pub fn get(&self, instrument: Instrument) -> Option<&CustomInstrument> {
         match instrument {
             Instrument(id) if id >= self.vanilla_instruments => self
