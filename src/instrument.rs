@@ -98,12 +98,16 @@ impl InstrumentSet {
         }
     }
 
-    pub fn push(&mut self, custom_instrument: CustomInstrument) -> Result<(), CustomInstrument> {
+    pub fn push(
+        &mut self,
+        custom_instrument: CustomInstrument,
+    ) -> Result<Instrument, CustomInstrument> {
         if self.custom_instruments.len() + self.vanilla_instruments as usize >= 256 {
             return Err(custom_instrument);
         }
+        let instrument = Instrument(self.instrument_count());
         self.custom_instruments.push(custom_instrument);
-        Ok(())
+        Ok(instrument)
     }
 
     pub fn as_slice(&self) -> &[CustomInstrument] {
