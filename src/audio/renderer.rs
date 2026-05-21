@@ -211,7 +211,7 @@ impl NbsAudioRendererBuilder {
 
     pub fn audio_provider(
         self,
-        audio_provider: Box<dyn InstrumentAudioProvider + Send>,
+        audio_provider: impl InstrumentAudioProvider + Send + 'static,
     ) -> NbsAudioRendererBuilder {
         let NbsAudioRendererBuilder {
             nbs,
@@ -219,6 +219,8 @@ impl NbsAudioRendererBuilder {
             sample_rate,
             audio_provider: _,
         } = self;
+        let audio_provider =
+            Box::new(audio_provider) as Box<dyn InstrumentAudioProvider + Send + 'static>;
         NbsAudioRendererBuilder {
             nbs,
             cache_capacity,
