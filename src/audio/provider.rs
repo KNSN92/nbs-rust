@@ -10,6 +10,12 @@ pub trait InstrumentAudioProvider {
     fn get_audio(&self, instrument: Instrument) -> Option<InstrumentAudio>;
 }
 
+impl InstrumentAudioProvider for Box<dyn InstrumentAudioProvider + Send> {
+    fn get_audio(&self, instrument: Instrument) -> Option<InstrumentAudio> {
+        self.as_ref().get_audio(instrument)
+    }
+}
+
 pub struct VanillaAudioProvider {
     vanilla_instruments: u8,
 }
