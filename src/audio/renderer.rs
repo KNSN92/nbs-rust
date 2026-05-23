@@ -28,7 +28,7 @@ fn build_tempo_mapping(nbs: &Nbs) -> Vec<(Tick, f32)> {
     let default_tempo = nbs.header.song_meta.tempo;
     let mut tempo_mapping = Vec::new();
     for (&tick, notes_in_tick) in nbs.note_blocks.inner_tick_notes() {
-        let mut tempo = (tick == 0).then_some(default_tempo);
+        let mut tempo = None;
         for (_, note) in notes_in_tick {
             if nbs.instrument_set.is_tempo_changer(note.instrument) {
                 tempo = Some(note.pitch as f32 / 15.0);
@@ -40,7 +40,11 @@ fn build_tempo_mapping(nbs: &Nbs) -> Vec<(Tick, f32)> {
         }
     }
     tempo_mapping.sort_by_key(|(tick, _)| *tick);
-    // Add a tempo mapping at the end of the song to simplify tempo changing logic.
+    if let Some((tick, _)) = tempo_mapping.first()
+        && *tick > 0
+    {
+        tempo_mapping.insert(0, (0, default_tempo));
+    }
     tempo_mapping.push((
         Tick::MAX,
         tempo_mapping
