@@ -69,6 +69,12 @@ impl Nbs {
         }
     }
 
+    pub fn sync_header(&mut self) {
+        self.header.song_meta.vanilla_instruments = self.instrument_set.vanilla_instrument_count();
+        self.header.song_meta.length = self.note_blocks.ticks_len() as u16;
+        self.header.song_meta.layers = self.note_blocks.layer_count();
+    }
+
     pub fn read(reader: &mut impl Read) -> Result<Self, NbsIOError> {
         read_nbs(reader)
     }

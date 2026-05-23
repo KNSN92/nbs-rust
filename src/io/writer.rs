@@ -25,66 +25,33 @@ pub trait WriteStringExt: byteorder::WriteBytesExt {
 
 impl<R: WriteBytesExt + ?Sized> WriteStringExt for R {}
 
-/// Writes the given NBS to the writer.
-/// This function trusts that the fields in the header are correctly set, and writes these fields without calculating them from the note blocks and custom instruments.
-/// This function is faster than `write_nbs`, but may produce invalid NBS if the header fields are not correctly set.
-/// Providing some NBS data structures from this crate such as `NoteBlocks` and `CustomInstruments` to the header fields without modification may cause invalid NBS, so be careful when using this function.
-#[allow(unused)]
-fn write_nbs_trusted_header(writer: &mut impl Write, nbs: &Nbs) -> Result<(), NbsIOError> {
-    let version = nbs.version;
-    write_header(writer, version, nbs, true)?;
-    write_note_blocks_and_layers(writer, version, &nbs.note_blocks)?;
-    write_custom_instruments(writer, &nbs.instrument_set)?;
-    Ok(())
-}
-
 /// Writes the given NBS to the writer. This function calculating the some fields in the header from the note blocks and custom instruments, and writes these calculated values.
 pub fn write_nbs(writer: &mut impl Write, nbs: &Nbs) -> Result<(), NbsIOError> {
     let version = nbs.version;
-    write_header(writer, version, nbs, false)?;
+    write_header(writer, version, nbs)?;
     write_note_blocks_and_layers(writer, version, &nbs.note_blocks)?;
     write_custom_instruments(writer, &nbs.instrument_set)?;
     Ok(())
 }
 
-fn write_header(
-    writer: &mut impl Write,
-    version: NbsVersion,
-    nbs: &Nbs,
-    trusted: bool,
-) -> Result<(), NbsIOError> {
+fn write_header(writer: &mut impl Write, version: NbsVersion, nbs: &Nbs) -> Result<(), NbsIOError> {
     let header = &nbs.header;
-    let vanilla_instruments = if trusted {
-        header.song_meta.vanilla_instruments
-    } else {
-        nbs.instrument_set.vanilla_instrument_count()
-    };
-    let song_length = if trusted {
-        header.song_meta.length
-    } else {
-        nbs.note_blocks.ticks_len() as u16
-    };
-    let layer_count = if trusted {
-        header.song_meta.layers
-    } else {
-        nbs.note_blocks.layer_count()
-    };
     nbsver_required!(
         version > Classic,
         {
             writer.write_u16::<LittleEndian>(0)?;
             writer.write_u8(version as u8)?;
-            writer.write_u8(vanilla_instruments)?;
+            writer.write_u8(header.song_meta.vanilla_instruments)?;
         },
         {
-            writer.write_u16::<LittleEndian>(song_length)?;
+            writer.write_u16::<LittleEndian>(header.song_meta.length)?;
         }
     );
     nbsver_required!(
         version >= V3,
-        writer.write_u16::<LittleEndian>(song_length)?
+        writer.write_u16::<LittleEndian>(header.song_meta.length)?
     );
-    writer.write_u16::<LittleEndian>(layer_count)?;
+    writer.write_u16::<LittleEndian>(header.song_meta.layers)?;
     writer.write_string_len_i32::<LittleEndian>(&header.song_info.name)?;
     writer.write_string_len_i32::<LittleEndian>(&header.song_info.author)?;
     writer.write_string_len_i32::<LittleEndian>(&header.song_info.original_author)?;
