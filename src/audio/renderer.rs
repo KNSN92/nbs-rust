@@ -151,7 +151,7 @@ impl Iterator for NbsAudioRenderer {
                 }
             }
 
-            if self.tick >= self.tempo_mapping[self.current_tempo_index].0 {
+            if self.tick >= self.tempo_mapping[self.current_tempo_index + 1].0 {
                 self.current_tempo_index += 1;
             }
             if let Some(notes_in_tick) = self.nbs.note_blocks.notes_at_tick(self.tick).cloned() {
