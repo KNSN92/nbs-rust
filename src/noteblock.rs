@@ -17,7 +17,7 @@ impl Default for Note {
             instrument: Instrument::Harp,
             key: 45,
             volume: 100,
-            panning: 0,
+            panning: 100,
             pitch: 0,
         }
     }
@@ -146,7 +146,7 @@ impl Default for Layer {
             name: String::new(),
             lock: false,
             volume: 100,
-            panning: 0,
+            panning: 100,
         }
     }
 }
