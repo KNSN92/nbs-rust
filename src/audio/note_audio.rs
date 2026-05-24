@@ -81,7 +81,7 @@ fn panning(note: &Note, layer: Option<&Layer>) -> [Float; 2] {
         0.0 => note_panning,
         _ => (layer_panning + note_panning) / 2.0,
     };
-    [panning, 2.0 - panning]
+    [2.0 - panning, panning]
 }
 
 fn pitch(note: &Note, custom_instrument: Option<&CustomInstrument>) -> f64 {
