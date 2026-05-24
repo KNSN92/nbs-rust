@@ -66,9 +66,7 @@ impl NbsAudioRenderer {
             sample_rate: None,
         }
     }
-}
 
-impl NbsAudioRenderer {
     fn new(
         nbs: Nbs,
         audio_provider: Box<dyn InstrumentAudioProvider + Send>,
