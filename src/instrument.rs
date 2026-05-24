@@ -75,12 +75,12 @@ impl InstrumentSet {
     }
 
     pub fn is_tempo_changer(&self, instrument: Instrument) -> bool {
-        self.get(instrument)
+        self.custom_instrument(instrument)
             .map(|ci| &ci.name == TEMPO_CHANGER)
             .unwrap_or(false)
     }
 
-    pub fn get(&self, instrument: Instrument) -> Option<&CustomInstrument> {
+    pub fn custom_instrument(&self, instrument: Instrument) -> Option<&CustomInstrument> {
         match instrument {
             Instrument(id) if id >= self.vanilla_instruments => self
                 .custom_instruments
@@ -89,7 +89,10 @@ impl InstrumentSet {
         }
     }
 
-    pub fn get_mut(&mut self, instrument: Instrument) -> Option<&mut CustomInstrument> {
+    pub fn custom_instrument_mut(
+        &mut self,
+        instrument: Instrument,
+    ) -> Option<&mut CustomInstrument> {
         match instrument {
             Instrument(id) if id >= self.vanilla_instruments => self
                 .custom_instruments
@@ -110,11 +113,11 @@ impl InstrumentSet {
         Ok(instrument)
     }
 
-    pub fn as_slice(&self) -> &[CustomInstrument] {
+    pub fn all_custom_instruments(&self) -> &[CustomInstrument] {
         &self.custom_instruments
     }
 
-    pub fn as_slice_mut(&mut self) -> &mut [CustomInstrument] {
+    pub fn all_custom_instruments_mut(&mut self) -> &mut [CustomInstrument] {
         &mut self.custom_instruments
     }
 

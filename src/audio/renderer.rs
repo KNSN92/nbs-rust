@@ -111,7 +111,7 @@ impl NbsAudioRenderer {
                 let audio = NoteAudio::new(
                     note,
                     layer,
-                    self.nbs.instrument_set.get(note.instrument),
+                    self.nbs.instrument_set.custom_instrument(note.instrument),
                     &*self.audio_provider,
                     self.sample_rate,
                 )?;
