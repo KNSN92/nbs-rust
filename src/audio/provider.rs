@@ -61,7 +61,7 @@ impl FileAudioProvider {
             Vec::with_capacity(instrument_set.custom_instrument_count() as usize);
         let mut failed_custom_instruments =
             Vec::with_capacity(instrument_set.custom_instrument_count() as usize);
-        for ci in instrument_set.as_slice() {
+        for ci in instrument_set.all_custom_instruments() {
             if ci.name == TEMPO_CHANGER {
                 custom_instrument_audios.push(None);
                 continue;

@@ -111,7 +111,7 @@ fn write_custom_instruments(
     instrument_set: &InstrumentSet,
 ) -> Result<(), NbsIOError> {
     writer.write_u8(instrument_set.custom_instrument_count())?;
-    for custom_instrument in instrument_set.as_slice() {
+    for custom_instrument in instrument_set.all_custom_instruments() {
         writer.write_string_len_i32::<LittleEndian>(&custom_instrument.name)?;
         writer.write_string_len_i32::<LittleEndian>(&custom_instrument.file_name)?;
         writer.write_u8(custom_instrument.key)?;
