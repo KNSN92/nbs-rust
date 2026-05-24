@@ -41,10 +41,9 @@ fn build_tempo_mapping(nbs: &Nbs) -> Vec<(Tick, f32)> {
         }
     }
     tempo_mapping.sort_by_key(|(tick, _)| *tick);
-    if let Some((tick, _)) = tempo_mapping.first()
-        && *tick > 0
-    {
-        tempo_mapping.insert(0, (0, default_tempo));
+    match tempo_mapping.first() {
+        Some((tick, _)) if *tick == 0 => {}
+        _ => tempo_mapping.insert(0, (0, default_tempo)),
     }
     tempo_mapping.push((
         Tick::MAX,
