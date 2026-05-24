@@ -3,11 +3,12 @@ use std::num::NonZeroUsize;
 use lru::LruCache;
 
 use crate::{
-    Instrument, Nbs, Tick,
+    Nbs, Tick,
     audio::{
         Frame, NoteAudio, SampleRate,
         provider::{InstrumentAudioProvider, VanillaAudioProvider},
     },
+    instrument::Instrument,
     noteblock::{LayerId, Note},
 };
 

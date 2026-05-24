@@ -1,8 +1,8 @@
 use std::{fs::File, path::Path};
 
 use crate::{
-    Instrument,
     audio::{InstrumentAudio, vanilla_audio::VANILLA_AUDIOS},
+    instrument::Instrument,
     instrument::{CustomInstrument, InstrumentSet, TEMPO_CHANGER, VANILLA_INSTRUMENT_COUNT},
 };
 
