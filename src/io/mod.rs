@@ -1,3 +1,5 @@
+#[cfg(feature = "midi")]
+pub mod midi;
 mod reader;
 mod writer;
 #[cfg(feature = "zip")]
