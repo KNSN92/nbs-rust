@@ -1,12 +1,11 @@
 #[cfg(feature = "audio")]
 pub mod audio;
 pub mod header;
-mod instrument;
+pub mod instrument;
 pub mod io;
 mod nbs;
 pub mod noteblock;
 
-pub use instrument::Instrument;
 pub use nbs::*;
 
 pub type Tick = u32;

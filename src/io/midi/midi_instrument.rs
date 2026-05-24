@@ -1,6 +1,6 @@
 // https://gist.github.com/u3002/cf4daa83bc82b5917fc86fb23815578a
 
-use crate::Instrument;
+use crate::instrument::Instrument;
 
 #[allow(unused)]
 #[derive(Debug, Clone, Copy)]
