@@ -100,16 +100,18 @@ impl NoteBlocks {
         self.len = self.len.max(tick + 1);
 
         let notes = self.by_tick_notes.entry(tick).or_default();
-        let i = notes
-            .binary_search_by(|(l, _)| l.cmp(&layer))
-            .unwrap_or_else(|i| i);
-        notes.insert(i, (layer, note));
+        let index = notes.binary_search_by(|(l, _)| l.cmp(&layer));
+        match index {
+            Ok(i) => notes[i] = (layer, note),
+            Err(i) => notes.insert(i, (layer, note)),
+        }
 
         let notes = self.by_layer_notes.entry(layer).or_default();
-        let i = notes
-            .binary_search_by(|(t, _)| t.cmp(&tick))
-            .unwrap_or_else(|i| i);
-        notes.insert(i, (tick, note));
+        let index = notes.binary_search_by(|(t, _)| t.cmp(&tick));
+        match index {
+            Ok(i) => notes[i] = (tick, note),
+            Err(i) => notes.insert(i, (tick, note)),
+        }
 
         // If the tick is new, insert it into the ticks vector while keeping it sorted
         self.ticks
