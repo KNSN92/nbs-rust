@@ -11,6 +11,56 @@ pub struct MidiInstrument {
     pub short_name: Option<&'static str>,
 }
 
+pub struct MidiInstrumentSet {
+    pub override_instruments: [Option<(Instrument, i8)>; MIDI_INSTRUMENTS.len()],
+    pub override_drums: [Option<(Instrument, i8)>; MIDI_DRUMS.len()],
+}
+
+impl MidiInstrumentSet {
+    pub fn new() -> Self {
+        MidiInstrumentSet {
+            override_instruments: [None; MIDI_INSTRUMENTS.len()],
+            override_drums: [None; MIDI_DRUMS.len()]
+        }
+    }
+
+    pub fn override_instrument(&mut self, id: usize, instrument: Instrument, octave: i8) {
+        if id < self.override_instruments.len() {
+            self.override_instruments[id] = Some((instrument, octave));
+        }
+    }
+
+    pub fn override_drum(&mut self, id: usize, instrument: Instrument, key: i8) {
+        if id < self.override_drums.len() {
+            self.override_drums[id] = Some((instrument, key));
+        }
+    }
+
+    pub fn get_instrument(&self, id: usize) -> Option<MidiInstrument> {
+        let mut ins = *MIDI_INSTRUMENTS.get(id)?;
+        if let Some(ins_override) = self.override_instruments.get(id).copied().flatten() {
+            ins.instrument = ins_override.0;
+            ins.octave = ins_override.1;
+        }
+        Some(ins)
+    }
+
+    pub fn get_drum(&self, id: usize) -> Option<MidiPercussion> {
+        let mut drum = *MIDI_DRUMS.get(id - 24)?; // MIDI percussion key starts from 24
+        if let Some(drum_override) = self.override_drums.get(id).copied().flatten() {
+            drum.instrument = drum_override.0;
+            drum.key = drum_override.1;
+        }
+        Some(drum)
+    }
+}
+
+impl Default for MidiInstrumentSet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 macro_rules! midi_ins {
     ($name: literal, $ins: ident, $octave: literal, $short_name: literal) => {
         MidiInstrument {
