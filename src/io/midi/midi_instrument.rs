@@ -12,8 +12,8 @@ pub struct MidiInstrument {
 }
 
 pub struct MidiInstrumentSet {
-    pub override_instruments: [Option<(Instrument, i8)>; MIDI_INSTRUMENTS.len()],
-    pub override_drums: [Option<(Instrument, i8)>; MIDI_DRUMS.len()],
+    override_instruments: [Option<(Instrument, i8)>; MIDI_INSTRUMENTS.len()],
+    override_drums: [Option<(Instrument, i8)>; MIDI_DRUMS.len()],
 }
 
 impl MidiInstrumentSet {
