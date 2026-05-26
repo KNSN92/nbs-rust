@@ -36,7 +36,7 @@ impl MidiInstrumentSet {
         }
     }
 
-    pub fn get_instrument(&self, id: usize) -> Option<MidiInstrument> {
+    pub(crate) fn get_instrument(&self, id: usize) -> Option<MidiInstrument> {
         let mut ins = *MIDI_INSTRUMENTS.get(id)?;
         if let Some(ins_override) = self.override_instruments.get(id).copied().flatten() {
             ins.instrument = ins_override.0;
@@ -45,7 +45,7 @@ impl MidiInstrumentSet {
         Some(ins)
     }
 
-    pub fn get_drum(&self, id: usize) -> Option<MidiPercussion> {
+    pub(crate) fn get_drum(&self, id: usize) -> Option<MidiPercussion> {
         let mut drum = *MIDI_DRUMS.get(id - 24)?; // MIDI percussion key starts from 24
         if let Some(drum_override) = self.override_drums.get(id).copied().flatten() {
             drum.instrument = drum_override.0;
