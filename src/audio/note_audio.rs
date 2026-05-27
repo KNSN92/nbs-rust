@@ -88,7 +88,7 @@ fn panning(note: &Note, layer: Option<&Layer>) -> [Float; 2] {
     [2.0 - panning, panning]
 }
 
-fn pitch(note: &Note, custom_instrument: Option<&CustomInstrument>) -> f64 {
+pub(crate) fn pitch(note: &Note, custom_instrument: Option<&CustomInstrument>) -> f64 {
     let instrument_key = custom_instrument
         .map(|ci| ci.key as f64 - 45.0)
         .unwrap_or(0.0);
