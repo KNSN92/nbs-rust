@@ -1,4 +1,4 @@
-use std::{fs::File, io::Cursor, num::NonZeroU32, sync::Arc};
+use std::{fs::File, io::Cursor, num::NonZeroU32, sync::Arc, time::Duration};
 
 use crate::audio::{
     Channels, Frame, Sample, SampleRate,
@@ -53,6 +53,11 @@ impl InstrumentAudio {
     #[inline]
     pub fn frame_count(&self) -> usize {
         self.frames.len()
+    }
+
+    #[inline]
+    pub fn duration(&self) -> Duration {
+        Duration::from_secs_f64(self.frames.len() as f64 / self.sample_rate.get() as f64)
     }
 }
 
