@@ -62,22 +62,27 @@ impl NbsAudioRenderer {
                 nbs.instrument_set.vanilla_instrument_count(),
             )),
             nbs,
-            cache_capacity: None,
-            sample_rate: None,
+            cache_capacity: Some(NonZeroUsize::new(256).unwrap()),
+            sample_rate: 48000u32.try_into().unwrap(),
         }
     }
 
     fn new(
         nbs: Nbs,
         audio_provider: Box<dyn InstrumentAudioProvider + Send>,
-        cache_capacity: NonZeroUsize,
+        cache_capacity: Option<NonZeroUsize>,
         sample_rate: SampleRate,
     ) -> Self {
         let tempo_mapping = build_tempo_mapping(&nbs);
+        let note_cache = if let Some(capacity) = cache_capacity {
+            LruCache::new(capacity)
+        } else {
+            LruCache::unbounded()
+        };
         NbsAudioRenderer {
             audio_provider,
             nbs,
-            note_cache: LruCache::new(cache_capacity),
+            note_cache,
             sample_rate,
             tick: 0,
             samples_until_next_tick: 0,
@@ -197,7 +202,7 @@ pub struct NbsAudioRendererBuilder {
     nbs: Nbs,
     audio_provider: Box<dyn InstrumentAudioProvider + Send>,
     cache_capacity: Option<NonZeroUsize>,
-    sample_rate: Option<SampleRate>,
+    sample_rate: SampleRate,
 }
 
 impl NbsAudioRendererBuilder {
@@ -206,8 +211,13 @@ impl NbsAudioRendererBuilder {
         self
     }
 
+    pub fn cache_unbounded(mut self) -> Self {
+        self.cache_capacity = None;
+        self
+    }
+
     pub fn sample_rate(mut self, sample_rate: SampleRate) -> Self {
-        self.sample_rate = Some(sample_rate);
+        self.sample_rate = sample_rate;
         self
     }
 
@@ -235,8 +245,8 @@ impl NbsAudioRendererBuilder {
         NbsAudioRenderer::new(
             self.nbs,
             self.audio_provider,
-            self.cache_capacity.unwrap_or(256usize.try_into().unwrap()),
-            self.sample_rate.unwrap_or(48000u32.try_into().unwrap()),
+            self.cache_capacity,
+            self.sample_rate,
         )
     }
 }
