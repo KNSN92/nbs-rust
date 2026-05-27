@@ -1,4 +1,4 @@
-use std::{num::NonZeroU32, sync::Arc};
+use std::{num::NonZeroU32, sync::Arc, time::Duration};
 
 use rubato::{
     Async, FixedAsync, Indexing, Resampler, SincInterpolationParameters, SincInterpolationType,
@@ -45,6 +45,10 @@ impl NoteAudio {
     #[inline]
     pub fn sample_rate(&self) -> NonZeroU32 {
         self.sample_rate
+    }
+
+    pub fn duration(&self) -> Duration {
+        Duration::from_secs_f64(self.frames.len() as f64 / self.sample_rate.get() as f64)
     }
 
     pub fn for_note(&self, note: &Note, layer: Option<&Layer>) -> Self {

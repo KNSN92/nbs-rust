@@ -1,4 +1,4 @@
-use std::num::NonZeroUsize;
+use std::{num::NonZeroUsize, time::Duration};
 
 use lru::LruCache;
 
@@ -96,6 +96,43 @@ impl NbsAudioRenderer {
     #[inline]
     pub fn sample_rate(&self) -> SampleRate {
         self.sample_rate
+    }
+
+    pub fn duration(&self) -> Duration {
+        let total_ticks = self.nbs.note_blocks.ticks_len();
+        let mut duration_secs = 0.0;
+        for i in 0..self.tempo_mapping.len() {
+            let (start_tick, tempo) = self.tempo_mapping[i];
+            let (end_tick, _) = self.tempo_mapping[i + 1];
+            if start_tick >= total_ticks {
+                break;
+            }
+            let ticks_in_segment = (end_tick.min(total_ticks) - start_tick) as f32;
+            duration_secs += ticks_in_segment / tempo;
+        }
+        Duration::from_secs_f32(duration_secs)
+    }
+
+    pub fn duration_including_loop(&self) -> Option<Duration> {
+        let (loop_count, loop_start_tick) = if self.nbs.header.song_meta.looping.enabled && let Some(loop_count) = self.nbs.header.song_meta.looping.count {
+            (loop_count.get() as u32, self.nbs.header.song_meta.looping.start_tick as u32)
+        } else {
+            return None;
+        };
+        let mut first_duration_secs = 0.0;
+        for i in 0..self.tempo_mapping.len() {
+            let (start_tick, tempo) = self.tempo_mapping[i];
+            let (end_tick, _) = self.tempo_mapping[i + 1];
+            if start_tick >= loop_start_tick {
+                break;
+            }
+            let ticks_in_segment = (end_tick.min(loop_start_tick) - start_tick) as f32;
+            first_duration_secs += ticks_in_segment / tempo;
+        }
+        let first_duration = Duration::from_secs_f32(first_duration_secs);
+        let loop_duration = self.duration() - first_duration;
+        let total_duration = first_duration + loop_duration * loop_count;
+        Some(total_duration)
     }
 
     pub fn seek_to_tick(&mut self, tick: Tick) {
