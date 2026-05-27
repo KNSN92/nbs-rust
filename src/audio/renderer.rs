@@ -5,8 +5,7 @@ use lru::LruCache;
 use crate::{
     Nbs, Tick,
     audio::{
-        Frame, NoteAudio, SampleRate,
-        provider::{InstrumentAudioProvider, VanillaAudioProvider},
+        Frame, NoteAudio, SampleRate, provider::{InstrumentAudioProvider, VanillaAudioProvider}
     },
     instrument::Instrument,
     noteblock::{LayerId, Note},
@@ -101,7 +100,7 @@ impl NbsAudioRenderer {
     pub fn duration(&self) -> Duration {
         let total_ticks = self.nbs.note_blocks.ticks_len();
         let mut duration_secs = 0.0;
-        for i in 0..self.tempo_mapping.len() {
+        for i in 0..self.tempo_mapping.len() - 1 {
             let (start_tick, tempo) = self.tempo_mapping[i];
             let (end_tick, _) = self.tempo_mapping[i + 1];
             if start_tick >= total_ticks {
@@ -110,6 +109,32 @@ impl NbsAudioRenderer {
             let ticks_in_segment = (end_tick.min(total_ticks) - start_tick) as f32;
             duration_secs += ticks_in_segment / tempo;
         }
+        //TODO: The duration calculation is currently based on the tempo changes and ticks, which may not be accurate if there are long audio samples that sustain over multiple ticks. We need to consider the duration of each note and its pitch to calculate a more accurate duration of the song.
+        // let longest_instrument_duration: Duration = (0..self.nbs.instrument_set.instrument_count())
+        //     .map(Instrument)
+        //     .filter_map(|ins| self.audio_provider.get_audio(ins).map(|audio| (ins, audio)))
+        //     .map(|(ins, audio)| {
+        //         audio.duration().as_secs_f64() / pitch(
+        //             &Note {
+        //                 instrument: ins,
+        //                 key: 0,
+        //                 ..Default::default()
+        //             },
+        //             self.nbs.instrument_set.custom_instrument(ins)
+        //         )
+        //     })
+        //     .map(Duration::from_secs_f64)
+        //     .max()
+        //     .unwrap_or(Duration::ZERO);
+        // let fastest_tempo = self.tempo_mapping.iter().map(|(_, t)| *t as f64).fold(f64::NEG_INFINITY, f64::max);
+        // let upstreaming_ticks = (longest_instrument_duration.as_secs_f64() * fastest_tempo).ceil() as u32;
+        // let mut duration_secs = f32::NEG_INFINITY;
+        // for tick in self.nbs.note_blocks.ticks().iter().rev().map(|t| *t) {
+        //     if tick + upstreaming_ticks < total_ticks {
+        //         break;
+        //     }
+        //     duration_secs = duration_secs.max();
+        // }
         Duration::from_secs_f32(duration_secs)
     }
 
