@@ -76,7 +76,7 @@ impl InstrumentSet {
 
     pub fn is_tempo_changer(&self, instrument: Instrument) -> bool {
         self.custom_instrument(instrument)
-            .map(|ci| &ci.name == TEMPO_CHANGER)
+            .map(|ci| ci.name == TEMPO_CHANGER)
             .unwrap_or(false)
     }
 
