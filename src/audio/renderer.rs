@@ -5,7 +5,8 @@ use lru::LruCache;
 use crate::{
     Nbs, Tick,
     audio::{
-        Frame, NoteAudio, SampleRate, provider::{InstrumentAudioProvider, VanillaAudioProvider}
+        Frame, NoteAudio, SampleRate,
+        provider::{InstrumentAudioProvider, VanillaAudioProvider},
     },
     instrument::Instrument,
     noteblock::{LayerId, Note},
@@ -139,8 +140,13 @@ impl NbsAudioRenderer {
     }
 
     pub fn duration_including_loop(&self) -> Option<Duration> {
-        let (loop_count, loop_start_tick) = if self.nbs.header.song_meta.looping.enabled && let Some(loop_count) = self.nbs.header.song_meta.looping.count {
-            (loop_count.get() as u32, self.nbs.header.song_meta.looping.start_tick as u32)
+        let (loop_count, loop_start_tick) = if self.nbs.header.song_meta.looping.enabled
+            && let Some(loop_count) = self.nbs.header.song_meta.looping.count
+        {
+            (
+                loop_count.get() as u32,
+                self.nbs.header.song_meta.looping.start_tick as u32,
+            )
         } else {
             return None;
         };
@@ -228,17 +234,6 @@ impl Iterator for NbsAudioRenderer {
             }
             self.tick += 1;
             self.samples_until_next_tick = self.samples_per_tick();
-
-            // This is the legacy debugging code. If we again need to debug performance issue, We will resuscitate this code and some codes about collecting data. ;)
-            // println!(
-            //     "Tick: {} / {}, Playing Sounds: {:<3} (max: {:<4}), Added Sounds: {:<2}, Cache Hit Rate: {:.2}%",
-            //     self.tick,
-            //     self.nbs.note_blocks.ticks_len(),
-            //     self.playing_sounds.len(),
-            //     self.max_sound_count,
-            //     self.playing_sounds.len() - prev_sounds,
-            //     (self.cache_hits as f32 / (self.cache_hits + self.cache_misses) as f32) * 100.0
-            // );
         } else {
             self.samples_until_next_tick -= 1;
         }
