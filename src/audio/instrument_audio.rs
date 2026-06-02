@@ -97,4 +97,10 @@ impl Iterator for InstrumentAudio {
         }
         frame
     }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.frames.len() - self.pos;
+        (remaining, Some(remaining))
+    }
 }
