@@ -247,10 +247,6 @@ impl Iterator for NbsAudioRenderer {
                 false
             }
         });
-        //TODO: We need to find a best way to clipping the samplee (maybe not needed?)
-        // let active = self.playing_sounds.len().max(1) as f32;
-        // let sample = sample / active.sqrt();
-        // let sample = sample.clamp(-1.0, 1.0);
         Some(frame)
     }
 }
