@@ -5,17 +5,16 @@ use lru::LruCache;
 use crate::{
     Nbs, Tick,
     audio::{
-        Frame, NoteAudio, SampleRate,
+        Frame, NoteAudio, NoteAudioKey, SampleRate,
         provider::{InstrumentAudioProvider, VanillaAudioProvider},
     },
-    instrument::Instrument,
     noteblock::{LayerId, Note},
 };
 
 pub struct NbsAudioRenderer {
     nbs: Nbs,
     audio_provider: Box<dyn InstrumentAudioProvider + Send>,
-    note_cache: LruCache<(Instrument, u8, i16), NoteAudio>,
+    note_cache: LruCache<NoteAudioKey, NoteAudio>,
     sample_rate: SampleRate,
     tick: Tick,
     samples_until_next_tick: usize,
@@ -175,7 +174,7 @@ impl NbsAudioRenderer {
     }
 
     fn note_audio(&mut self, note: &Note, layer: LayerId) -> Option<NoteAudio> {
-        let cache_key = (note.instrument, note.key, note.pitch);
+        let cache_key = NoteAudioKey::from(*note);
         let layer = self.nbs.note_blocks.layer(layer);
         match self.note_cache.get(&cache_key) {
             Some(cached_audio) => Some(cached_audio.for_note(note, layer)),
