@@ -7,9 +7,36 @@ use rubato::{
 
 use crate::{
     audio::{Float, Frame, InstrumentAudio, Sample, SampleRate, provider::InstrumentAudioProvider},
-    instrument::CustomInstrument,
+    instrument::{CustomInstrument, Instrument},
     noteblock::{Layer, Note},
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct NoteAudioKey {
+    instrument: Instrument,
+    key: u8,
+    pitch: i16,
+}
+
+impl NoteAudioKey {
+    pub fn new(instrument: Instrument, key: u8, pitch: i16) -> Self {
+        NoteAudioKey {
+            instrument,
+            key,
+            pitch,
+        }
+    }
+}
+
+impl From<Note> for NoteAudioKey {
+    fn from(note: Note) -> Self {
+        NoteAudioKey {
+            instrument: note.instrument,
+            key: note.key,
+            pitch: note.pitch,
+        }
+    }
+}
 
 pub struct NoteAudio {
     frames: Arc<[Frame]>,
