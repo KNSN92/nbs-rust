@@ -11,6 +11,7 @@ use crate::{
 pub struct NbsAudioRenderer {
     nbs: Nbs,
     sample_rate: SampleRate,
+    miss_policy: NoteAudioMissPolicy,
     audio_provider: NoteAudioProvider,
     tick: Tick,
     prefetch_tick: Tick,
@@ -59,6 +60,7 @@ impl NbsAudioRenderer {
             )),
             nbs,
             cache_capacity: Some(NonZeroUsize::new(256).unwrap()),
+            miss_policy: NoteAudioMissPolicy::SyncFallback,
             sample_rate: 48000u32.try_into().unwrap(),
             num_threads: thread::available_parallelism().unwrap_or(1.try_into().unwrap()),
         }
@@ -70,6 +72,7 @@ impl NbsAudioRenderer {
         audio_provider: Box<dyn InstrumentAudioProvider + Send>,
         cache_capacity: Option<NonZeroUsize>,
         sample_rate: SampleRate,
+        miss_policy: NoteAudioMissPolicy,
     ) -> Self {
         let tempo_mapping = build_tempo_mapping(&nbs);
         let audio_provider =
@@ -78,6 +81,7 @@ impl NbsAudioRenderer {
             nbs,
             audio_provider,
             sample_rate,
+            miss_policy,
             tick: 0,
             prefetch_tick: 0,
             samples_until_next_tick: 0,
@@ -214,12 +218,9 @@ impl NbsAudioRenderer {
             for (layer, note) in notes_in_tick {
                 let layer = self.nbs.note_blocks.layer(layer);
                 let custom_instrument = self.nbs.instrument_set.custom_instrument(note.instrument);
-                let audio = self.audio_provider.get(
-                    note,
-                    layer,
-                    custom_instrument,
-                    NoteAudioMissPolicy::Wait(None),
-                );
+                let audio =
+                    self.audio_provider
+                        .get(note, layer, custom_instrument, self.miss_policy);
                 if let Some(audio) = audio {
                     self.playing_sounds.push(audio);
                 }
@@ -259,6 +260,7 @@ impl Iterator for NbsAudioRenderer {
 pub struct NbsAudioRendererBuilder {
     nbs: Nbs,
     num_threads: NonZeroUsize,
+    miss_policy: NoteAudioMissPolicy,
     audio_provider: Box<dyn InstrumentAudioProvider + Send>,
     cache_capacity: Option<NonZeroUsize>,
     sample_rate: SampleRate,
@@ -267,6 +269,11 @@ pub struct NbsAudioRendererBuilder {
 impl NbsAudioRendererBuilder {
     pub fn num_threads(mut self, num_threads: NonZeroUsize) -> Self {
         self.num_threads = num_threads;
+        self
+    }
+
+    pub fn miss_policy(mut self, policy: NoteAudioMissPolicy) -> Self {
+        self.miss_policy = policy;
         self
     }
 
@@ -292,6 +299,7 @@ impl NbsAudioRendererBuilder {
         let NbsAudioRendererBuilder {
             nbs,
             cache_capacity,
+            miss_policy,
             sample_rate,
             audio_provider: _,
             num_threads,
@@ -302,6 +310,7 @@ impl NbsAudioRendererBuilder {
             nbs,
             num_threads,
             cache_capacity,
+            miss_policy,
             sample_rate,
             audio_provider,
         }
@@ -314,6 +323,7 @@ impl NbsAudioRendererBuilder {
             self.audio_provider,
             self.cache_capacity,
             self.sample_rate,
+            self.miss_policy,
         )
     }
 }
