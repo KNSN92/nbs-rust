@@ -183,6 +183,7 @@ pub struct NoteAudioProvider {
     prefetched_audios: HashMap<NoteAudioKey, (usize, NoteAudioWithState)>,
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum NoteAudioMissPolicy {
     SyncFallback,
     Wait(Option<Duration>),
