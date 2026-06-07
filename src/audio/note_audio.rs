@@ -362,7 +362,6 @@ impl NoteAudioProvider {
                 };
             }
         }
-        println!("{}", self.prefetched_audios.len());
     }
 
     fn receive_result_blocking(&mut self) -> Option<NoteAudioKey> {
