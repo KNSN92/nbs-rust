@@ -172,6 +172,58 @@ impl NbsAudioRenderer {
         let tempo = self.tempo_mapping[self.current_tempo_index].1;
         (self.sample_rate().get() as f32 / tempo).round() as usize
     }
+
+    fn loop_if_needed(&mut self) -> bool {
+        let looping = &self.nbs.header.song_meta.looping;
+        if looping.enabled {
+            match looping.count {
+                Some(count) if self.loop_count < count.get() => {
+                    self.loop_count += 1;
+                    self.seek_to_tick(looping.start_tick as u32);
+                }
+                Some(_) if self.playing_sounds.is_empty() => return false,
+                Some(_) => {}
+                None => self.seek_to_tick(looping.start_tick as u32),
+            }
+        } else if self.playing_sounds.is_empty() {
+            return false;
+        }
+        true
+    }
+
+    fn tick(&mut self) {
+        if self.tick >= self.tempo_mapping[self.current_tempo_index + 1].0 {
+            self.current_tempo_index += 1;
+        }
+        while self.audio_provider.prefetched_count() < 256
+            && self.prefetch_tick < self.nbs.note_blocks.ticks_len()
+        {
+            if let Some(notes_in_tick) = self.nbs.note_blocks.notes_at_tick(self.prefetch_tick) {
+                for (_, note) in notes_in_tick {
+                    let custom_instrument =
+                        self.nbs.instrument_set.custom_instrument(note.instrument);
+                    self.audio_provider.prefetch(*note, custom_instrument);
+                }
+            }
+            self.prefetch_tick += 1;
+        }
+        if let Some(notes_in_tick) = self.nbs.note_blocks.notes_at_tick(self.tick).cloned() {
+            for (layer, note) in notes_in_tick {
+                let layer = self.nbs.note_blocks.layer(layer);
+                let custom_instrument = self.nbs.instrument_set.custom_instrument(note.instrument);
+                let audio = self.audio_provider.get(
+                    note,
+                    layer,
+                    custom_instrument,
+                    NoteAudioMissPolicy::Wait(None),
+                );
+                if let Some(audio) = audio {
+                    self.playing_sounds.push(audio);
+                }
+            }
+        }
+        self.tick += 1;
+    }
 }
 
 impl Iterator for NbsAudioRenderer {
@@ -179,56 +231,10 @@ impl Iterator for NbsAudioRenderer {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.samples_until_next_tick == 0 {
-            if self.tick >= self.nbs.note_blocks.ticks_len() {
-                let looping = &self.nbs.header.song_meta.looping;
-                if looping.enabled {
-                    match looping.count {
-                        Some(count) if self.loop_count < count.get() => {
-                            self.loop_count += 1;
-                            self.seek_to_tick(looping.start_tick as u32);
-                        }
-                        Some(_) if self.playing_sounds.is_empty() => return None,
-                        Some(_) => {}
-                        None => self.seek_to_tick(looping.start_tick as u32),
-                    }
-                } else if self.playing_sounds.is_empty() {
-                    return None;
-                }
+            if self.tick >= self.nbs.note_blocks.ticks_len() && !self.loop_if_needed() {
+                return None;
             }
-
-            if self.tick >= self.tempo_mapping[self.current_tempo_index + 1].0 {
-                self.current_tempo_index += 1;
-            }
-            while self.audio_provider.prefetched_count() < 256
-                && self.prefetch_tick < self.nbs.note_blocks.ticks_len()
-            {
-                if let Some(notes_in_tick) = self.nbs.note_blocks.notes_at_tick(self.prefetch_tick)
-                {
-                    for (_, note) in notes_in_tick {
-                        let custom_instrument =
-                            self.nbs.instrument_set.custom_instrument(note.instrument);
-                        self.audio_provider.prefetch(*note, custom_instrument);
-                    }
-                }
-                self.prefetch_tick += 1;
-            }
-            if let Some(notes_in_tick) = self.nbs.note_blocks.notes_at_tick(self.tick).cloned() {
-                for (layer, note) in notes_in_tick {
-                    let layer = self.nbs.note_blocks.layer(layer);
-                    let custom_instrument =
-                        self.nbs.instrument_set.custom_instrument(note.instrument);
-                    let audio = self.audio_provider.get(
-                        note,
-                        layer,
-                        custom_instrument,
-                        NoteAudioMissPolicy::Wait(None),
-                    );
-                    if let Some(audio) = audio {
-                        self.playing_sounds.push(audio);
-                    }
-                }
-            }
-            self.tick += 1;
+            self.tick();
             self.samples_until_next_tick = self.samples_per_tick();
         } else {
             self.samples_until_next_tick -= 1;
