@@ -54,16 +54,7 @@ fn build_tempo_mapping(nbs: &Nbs) -> Vec<(Tick, f32)> {
 
 impl NbsAudioRenderer {
     pub fn builder(nbs: Nbs) -> NbsAudioRendererBuilder {
-        NbsAudioRendererBuilder {
-            audio_provider: Box::new(VanillaAudioProvider::new(
-                nbs.instrument_set.vanilla_instrument_count(),
-            )),
-            nbs,
-            cache_capacity: Some(NonZeroUsize::new(256).unwrap()),
-            miss_policy: NoteAudioMissPolicy::SyncFallback,
-            sample_rate: 48000u32.try_into().unwrap(),
-            num_threads: thread::available_parallelism().unwrap_or(1.try_into().unwrap()),
-        }
+        NbsAudioRendererBuilder::new(nbs)
     }
 
     fn new(
@@ -267,6 +258,19 @@ pub struct NbsAudioRendererBuilder {
 }
 
 impl NbsAudioRendererBuilder {
+    pub fn new(nbs: Nbs) -> Self {
+        NbsAudioRendererBuilder {
+            audio_provider: Box::new(VanillaAudioProvider::new(
+                nbs.instrument_set.vanilla_instrument_count(),
+            )),
+            nbs,
+            cache_capacity: Some(NonZeroUsize::new(256).unwrap()),
+            miss_policy: NoteAudioMissPolicy::SyncFallback,
+            sample_rate: 48000u32.try_into().unwrap(),
+            num_threads: thread::available_parallelism().unwrap_or(1.try_into().unwrap()),
+        }
+    }
+
     pub fn num_threads(mut self, num_threads: NonZeroUsize) -> Self {
         self.num_threads = num_threads;
         self
