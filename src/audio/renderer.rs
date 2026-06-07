@@ -61,6 +61,16 @@ impl NbsAudioRenderer {
         NbsAudioRendererBuilder::new(nbs, sample_rate).build()
     }
 
+    pub fn with_audio_provider(
+        nbs: Nbs,
+        sample_rate: SampleRate,
+        audio_provider: impl InstrumentAudioProvider + Send + 'static,
+    ) -> Self {
+        NbsAudioRendererBuilder::new(nbs, sample_rate)
+            .audio_provider(audio_provider)
+            .build()
+    }
+
     fn new_inner(
         nbs: Nbs,
         num_threads: NonZeroUsize,
