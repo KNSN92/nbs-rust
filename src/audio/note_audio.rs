@@ -209,11 +209,12 @@ struct NoteAudioResampleResult {
 
 impl NoteAudioProvider {
     pub fn new(
-        num_threads: usize,
+        num_threads: NonZeroUsize,
         sample_rate: SampleRate,
         cache_cap: Option<NonZeroUsize>,
         provider: Box<dyn InstrumentAudioProvider + Send>,
     ) -> Self {
+        let num_threads = num_threads.get();
         let (task_tx, task_rx) = unbounded();
         let task_tx = Some(task_tx);
         let (result_tx, result_rx) = unbounded();

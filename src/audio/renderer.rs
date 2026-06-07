@@ -1,4 +1,4 @@
-use std::{num::NonZeroUsize, time::Duration};
+use std::{num::NonZeroUsize, thread, time::Duration};
 
 use crate::{
     Nbs, Tick,
@@ -60,17 +60,20 @@ impl NbsAudioRenderer {
             nbs,
             cache_capacity: Some(NonZeroUsize::new(256).unwrap()),
             sample_rate: 48000u32.try_into().unwrap(),
+            num_threads: thread::available_parallelism().unwrap_or(1.try_into().unwrap()),
         }
     }
 
     fn new(
         nbs: Nbs,
+        num_threads: NonZeroUsize,
         audio_provider: Box<dyn InstrumentAudioProvider + Send>,
         cache_capacity: Option<NonZeroUsize>,
         sample_rate: SampleRate,
     ) -> Self {
         let tempo_mapping = build_tempo_mapping(&nbs);
-        let audio_provider = NoteAudioProvider::new(8, sample_rate, cache_capacity, audio_provider);
+        let audio_provider =
+            NoteAudioProvider::new(num_threads, sample_rate, cache_capacity, audio_provider);
         NbsAudioRenderer {
             nbs,
             audio_provider,
@@ -255,12 +258,18 @@ impl Iterator for NbsAudioRenderer {
 
 pub struct NbsAudioRendererBuilder {
     nbs: Nbs,
+    num_threads: NonZeroUsize,
     audio_provider: Box<dyn InstrumentAudioProvider + Send>,
     cache_capacity: Option<NonZeroUsize>,
     sample_rate: SampleRate,
 }
 
 impl NbsAudioRendererBuilder {
+    pub fn num_threads(mut self, num_threads: NonZeroUsize) -> Self {
+        self.num_threads = num_threads;
+        self
+    }
+
     pub fn cache_capacity(mut self, capacity: NonZeroUsize) -> Self {
         self.cache_capacity = Some(capacity);
         self
@@ -285,11 +294,13 @@ impl NbsAudioRendererBuilder {
             cache_capacity,
             sample_rate,
             audio_provider: _,
+            num_threads,
         } = self;
         let audio_provider =
             Box::new(audio_provider) as Box<dyn InstrumentAudioProvider + Send + 'static>;
         NbsAudioRendererBuilder {
             nbs,
+            num_threads,
             cache_capacity,
             sample_rate,
             audio_provider,
@@ -299,6 +310,7 @@ impl NbsAudioRendererBuilder {
     pub fn build(self) -> NbsAudioRenderer {
         NbsAudioRenderer::new(
             self.nbs,
+            self.num_threads,
             self.audio_provider,
             self.cache_capacity,
             self.sample_rate,
