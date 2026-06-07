@@ -102,6 +102,10 @@ impl NbsAudioRenderer {
         self.sample_rate
     }
 
+    pub fn current_tick(&self) -> Tick {
+        self.tick
+    }
+
     pub fn duration(&self) -> Duration {
         let total_ticks = self.nbs.note_blocks.ticks_len();
         let mut duration_secs = 0.0;
