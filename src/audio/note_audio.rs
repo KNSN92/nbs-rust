@@ -1,12 +1,19 @@
-use std::{num::NonZeroU32, sync::Arc, time::Duration};
-
-use rubato::{
-    Async, FixedAsync, Indexing, Resampler, SincInterpolationParameters, SincInterpolationType,
-    WindowFunction, audioadapter_buffers::direct::InterleavedSlice, calculate_cutoff,
+use std::{
+    collections::{HashMap, hash_map::Entry},
+    num::{NonZeroU32, NonZeroUsize},
+    sync::Arc,
+    thread,
+    time::Duration,
 };
 
+use crossbeam_channel::{Receiver, Sender, unbounded};
+use lru::LruCache;
+
 use crate::{
-    audio::{Float, Frame, InstrumentAudio, Sample, SampleRate, provider::InstrumentAudioProvider},
+    audio::{
+        Float, Frame, InstrumentAudio, SampleRate, provider::InstrumentAudioProvider,
+        resample::resample_audio,
+    },
     instrument::{CustomInstrument, Instrument},
     noteblock::{Layer, Note},
 };
@@ -38,6 +45,7 @@ impl From<Note> for NoteAudioKey {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct NoteAudio {
     frames: Arc<[Frame]>,
     volume: Float,
@@ -67,6 +75,22 @@ impl NoteAudio {
             sample_rate,
             pos: 0,
         })
+    }
+
+    pub fn from_frames(
+        frames: impl Into<Arc<[Frame]>>,
+        note: Note,
+        layer: Option<&Layer>,
+        sample_rate: SampleRate,
+    ) -> Self {
+        let frames = frames.into();
+        NoteAudio {
+            frames,
+            volume: volume(&note, layer),
+            panning: panning(&note, layer),
+            sample_rate,
+            pos: 0,
+        }
     }
 
     #[inline]
@@ -146,118 +170,270 @@ impl Iterator for NoteAudio {
     }
 }
 
-fn resample_audio(
-    audio: &InstrumentAudio,
-    pitch: f64,
+pub struct NoteAudioProvider {
+    audio_cache: LruCache<NoteAudioKey, Arc<[Frame]>>,
+    provider: Box<dyn InstrumentAudioProvider + Send>,
     sample_rate: SampleRate,
-) -> Option<Vec<Frame>> {
-    let input_len = audio.frame_count();
-    if input_len == 0 {
-        return Some(Vec::new());
-    }
 
-    let resample_ratio = sample_rate.get() as f64 / (audio.sample_rate().get() as f64 * pitch);
-    if !resample_ratio.is_finite() || resample_ratio <= 0.0 {
-        return None;
-    }
+    task_tx: Option<Sender<NoteAudioResampleTask>>,
+    result_rx: Receiver<NoteAudioResampleResult>,
+    threads: Vec<thread::JoinHandle<()>>,
 
-    let sinc_len = 64;
-    let window = WindowFunction::BlackmanHarris2;
-    let params = SincInterpolationParameters {
-        sinc_len,
-        f_cutoff: calculate_cutoff::<f32>(sinc_len, window),
-        interpolation: SincInterpolationType::Cubic,
-        oversampling_factor: 128,
-        window,
-    };
-
-    let mut resampler =
-        Async::<Sample>::new_sinc(resample_ratio, 1.0, &params, 1024, 2, FixedAsync::Input).ok()?;
-
-    let expected_output_len = (input_len as f64 * resample_ratio).ceil() as usize;
-    let delay = resampler.output_delay();
-    let output_capacity = resampler.process_all_needed_output_len(input_len);
-    let mut frames = vec![[0.0; 2]; output_capacity];
-
-    let input_audio = InterleavedSlice::new(audio.frames().as_flattened(), 2, input_len).ok()?;
-    let mut output_audio =
-        InterleavedSlice::new_mut(frames.as_flattened_mut(), 2, output_capacity).ok()?;
-
-    let mut input_offset = 0;
-    let mut output_offset = 0;
-    let mut input_frames_left = input_len;
-
-    while input_frames_left > 0 {
-        let input_frames_next = resampler.input_frames_next();
-        let partial_len = (input_frames_left < input_frames_next).then_some(input_frames_left);
-        let indexing = Indexing {
-            input_offset,
-            output_offset,
-            partial_len,
-            active_channels_mask: None,
-        };
-        let (input_frames, output_frames) = resampler
-            .process_into_buffer(&input_audio, &mut output_audio, Some(&indexing))
-            .ok()?;
-        let consumed = partial_len.unwrap_or(input_frames).min(input_frames_left);
-        input_offset += consumed;
-        input_frames_left -= consumed;
-        output_offset += output_frames;
-    }
-
-    while output_offset < delay + expected_output_len {
-        let indexing = Indexing {
-            input_offset,
-            output_offset,
-            partial_len: Some(0),
-            active_channels_mask: None,
-        };
-        let (_, output_frames) = resampler
-            .process_into_buffer(&input_audio, &mut output_audio, Some(&indexing))
-            .ok()?;
-        if output_frames == 0 {
-            return None;
-        }
-        output_offset += output_frames;
-    }
-
-    drop(output_audio);
-
-    frames.copy_within(delay..delay + expected_output_len, 0);
-    frames.truncate(expected_output_len);
-    Some(frames)
+    prefetching_count: usize,
+    prefetched_audios: HashMap<NoteAudioKey, (usize, NoteAudioWithState)>,
 }
 
-#[cfg(test)]
-mod tests {
-    use std::num::{NonZeroU16, NonZeroU32};
+pub enum NoteAudioMissPolicy {
+    SyncFallback,
+    Wait(Option<Duration>),
+    Skip,
+}
 
-    use crate::audio::InstrumentAudio;
+#[derive(Debug, Clone)]
+enum NoteAudioWithState {
+    Ready(Arc<[Frame]>),
+    Failed,
+    Fetching,
+}
 
-    use super::*;
+struct NoteAudioResampleTask {
+    key: NoteAudioKey,
+    pitch: f64,
+    audio: InstrumentAudio,
+}
 
-    #[test]
-    fn resampling_does_not_keep_large_fft_delay_at_the_start() {
-        let source_sample_rate = NonZeroU32::new(44_100).unwrap();
-        let target_sample_rate = NonZeroU32::new(48_000).unwrap();
-        let channels = NonZeroU16::new(2).unwrap();
+struct NoteAudioResampleResult {
+    key: NoteAudioKey,
+    audio: Option<Arc<[Frame]>>,
+}
 
-        let mut samples = vec![0.0; 12_000 * 2];
-        samples[0] = 1.0;
-        samples[1] = 1.0;
+impl NoteAudioProvider {
+    pub fn new(
+        num_threads: usize,
+        sample_rate: SampleRate,
+        cache_cap: Option<NonZeroUsize>,
+        provider: Box<dyn InstrumentAudioProvider + Send>,
+    ) -> Self {
+        let (task_tx, task_rx) = unbounded();
+        let task_tx = Some(task_tx);
+        let (result_tx, result_rx) = unbounded();
+        let mut threads = Vec::with_capacity(num_threads);
+        for i in 0..num_threads {
+            let task_rx = task_rx.clone();
+            let result_tx = result_tx.clone();
+            let handle = thread::Builder::new()
+                .name(format!("NoteAudioResampleWorker-{}", i))
+                .spawn(move || worker(task_rx, result_tx, sample_rate))
+                .unwrap();
+            threads.push(handle);
+        }
+        let audio_cache = match cache_cap {
+            Some(cap) => LruCache::new(cap),
+            None => LruCache::unbounded(),
+        };
+        Self {
+            audio_cache,
+            provider,
+            sample_rate,
+            task_tx,
+            result_rx,
+            threads,
+            prefetching_count: 0,
+            prefetched_audios: HashMap::new(),
+        }
+    }
 
-        let audio = InstrumentAudio::new(samples, channels, source_sample_rate);
-        let pitch = 2.0f64.powf(1.0 / 12.0);
-        let frames = resample_audio(&audio, pitch, target_sample_rate).unwrap();
+    pub fn prefetch(&mut self, note: Note, custom_instrument: Option<&CustomInstrument>) {
+        let key = NoteAudioKey::from(note);
+        if self.prefetched_audios.contains_key(&key) {
+            self.prefetched_audios.get_mut(&key).unwrap().0 += 1;
+            return;
+        }
+        if let Some(audio) = self.audio_cache.get(&key) {
+            self.prefetched_audios
+                .insert(key, (1, NoteAudioWithState::Ready(audio.clone())));
+            return;
+        }
+        let audio = if let Some(audio) = self.provider.get_audio(note.instrument) {
+            audio
+        } else {
+            return;
+        };
+        let pitch = pitch(&note, custom_instrument);
+        let is_ok = self
+            .task_tx
+            .as_ref()
+            .unwrap()
+            .send(NoteAudioResampleTask { key, pitch, audio })
+            .is_ok();
+        if is_ok {
+            self.prefetching_count += 1;
+        } else {
+            eprintln!("Failed to send note audio resample task");
+            return;
+        }
+        self.prefetched_audios
+            .insert(key, (1, NoteAudioWithState::Fetching));
+    }
 
-        let first_audible = frames
-            .iter()
-            .position(|[l, r]| l.abs().max(r.abs()) > 0.0001)
-            .unwrap();
+    pub fn prefetched_count(&self) -> usize {
+        self.prefetched_audios.len() + self.prefetching_count
+    }
 
-        assert!(
-            first_audible < 512,
-            "first audible frame was delayed to {first_audible}"
-        );
+    pub fn get(
+        &mut self,
+        note: Note,
+        layer: Option<&Layer>,
+        custom_instrument: Option<&CustomInstrument>,
+        policy: NoteAudioMissPolicy,
+    ) -> Option<NoteAudio> {
+        self.receive_results();
+        let key = NoteAudioKey::from(note);
+        match self.get_prefetched(key) {
+            Some(audio) => {
+                let audio = if let Some(audio) = audio {
+                    self.audio_cache.put(key, audio.clone());
+                    Some(NoteAudio::from_frames(audio, note, layer, self.sample_rate))
+                } else {
+                    None
+                };
+                return audio;
+            }
+            None => {}
+        }
+        if let Some(audio) = self.audio_cache.get(&key) {
+            let audio = NoteAudio::from_frames(audio.clone(), note, layer, self.sample_rate);
+            return Some(audio);
+        }
+        match policy {
+            NoteAudioMissPolicy::SyncFallback => {
+                self.consume_prefetched(key);
+                if let Some(audio) = self.provider.get_audio(note.instrument) {
+                    let pitch = pitch(&note, custom_instrument);
+                    let frames: Arc<[Frame]> =
+                        resample_audio(&audio, pitch, self.sample_rate)?.into();
+                    self.audio_cache.put(key, frames.clone());
+                    let audio = NoteAudio::from_frames(frames, note, layer, self.sample_rate);
+                    return Some(audio);
+                }
+            }
+            NoteAudioMissPolicy::Wait(timeout) => {
+                if !self.prefetched_audios.contains_key(&key) {
+                    return None;
+                }
+                let start = std::time::Instant::now();
+                loop {
+                    while self.prefetching_count > 0 {
+                        match (self.receive_result_blocking(), timeout) {
+                            (Some(recv_key), _) if recv_key == key => break,
+                            (_, Some(timeout)) if start.elapsed() >= timeout => break,
+                            _ => {}
+                        }
+                    }
+                    let audio = match self.get_prefetched(key) {
+                        Some(audio) => audio,
+                        None => return None,
+                    };
+                    let audio = if let Some(audio) = audio {
+                        self.audio_cache.put(key, audio.clone());
+                        Some(NoteAudio::from_frames(audio, note, layer, self.sample_rate))
+                    } else {
+                        None
+                    };
+                    return audio;
+                }
+            }
+            NoteAudioMissPolicy::Skip => {
+                self.consume_prefetched(key);
+                return None;
+            }
+        }
+        None
+    }
+
+    fn receive_results(&mut self) {
+        while let Ok(NoteAudioResampleResult { key, audio }) = self.result_rx.try_recv() {
+            self.prefetching_count -= 1;
+            if let Some(result) = self.prefetched_audios.get_mut(&key) {
+                result.1 = if let Some(audio) = audio {
+                    NoteAudioWithState::Ready(audio)
+                } else {
+                    NoteAudioWithState::Failed
+                };
+            }
+        }
+        println!("{}", self.prefetched_audios.len());
+    }
+
+    fn receive_result_blocking(&mut self) -> Option<NoteAudioKey> {
+        if let Ok(NoteAudioResampleResult { key, audio }) = self.result_rx.recv() {
+            self.prefetching_count -= 1;
+            if let Some(result) = self.prefetched_audios.get_mut(&key) {
+                result.1 = if let Some(audio) = audio {
+                    NoteAudioWithState::Ready(audio)
+                } else {
+                    NoteAudioWithState::Failed
+                };
+            }
+            Some(key)
+        } else {
+            None
+        }
+    }
+
+    fn consume_prefetched(&mut self, key: NoteAudioKey) {
+        if let Entry::Occupied(mut e) = self.prefetched_audios.entry(key) {
+            if e.get().0 > 1 {
+                let (c, _) = e.get_mut();
+                *c -= 1;
+            } else {
+                e.remove();
+            }
+        }
+    }
+
+    fn get_prefetched(&mut self, key: NoteAudioKey) -> Option<Option<Arc<[Frame]>>> {
+        match self.prefetched_audios.entry(key) {
+            Entry::Occupied(mut e) => {
+                let audio = if e.get().0 > 1 {
+                    let (c, audio) = e.get_mut();
+                    *c -= 1;
+                    audio.clone()
+                } else {
+                    e.remove().1
+                };
+                match audio {
+                    NoteAudioWithState::Ready(audio) => Some(Some(audio)),
+                    NoteAudioWithState::Failed => return Some(None),
+                    NoteAudioWithState::Fetching => None,
+                }
+            }
+            _ => None,
+        }
+    }
+}
+
+impl Drop for NoteAudioProvider {
+    fn drop(&mut self) {
+        self.task_tx.take();
+        for handle in self.threads.drain(..) {
+            let _ = handle.join();
+        }
+    }
+}
+
+fn worker(
+    task_rx: Receiver<NoteAudioResampleTask>,
+    result_tx: Sender<NoteAudioResampleResult>,
+    sample_rate: SampleRate,
+) {
+    loop {
+        let NoteAudioResampleTask { key, pitch, audio } = if let Ok(task) = task_rx.recv() {
+            task
+        } else {
+            break;
+        };
+        let audio = resample_audio(&audio, pitch, sample_rate).map(Arc::from);
+        let _ = result_tx.send(NoteAudioResampleResult { key, audio });
     }
 }

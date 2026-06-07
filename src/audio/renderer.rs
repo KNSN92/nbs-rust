@@ -1,22 +1,19 @@
 use std::{num::NonZeroUsize, time::Duration};
 
-use lru::LruCache;
-
 use crate::{
     Nbs, Tick,
     audio::{
-        Frame, NoteAudio, NoteAudioKey, SampleRate,
+        Frame, NoteAudio, NoteAudioMissPolicy, NoteAudioProvider, SampleRate,
         provider::{InstrumentAudioProvider, VanillaAudioProvider},
     },
-    noteblock::{LayerId, Note},
 };
 
 pub struct NbsAudioRenderer {
     nbs: Nbs,
-    audio_provider: Box<dyn InstrumentAudioProvider + Send>,
-    note_cache: LruCache<NoteAudioKey, NoteAudio>,
     sample_rate: SampleRate,
+    audio_provider: NoteAudioProvider,
     tick: Tick,
+    prefetch_tick: Tick,
     samples_until_next_tick: usize,
     loop_count: u8,
     current_tempo_index: usize,
@@ -73,17 +70,13 @@ impl NbsAudioRenderer {
         sample_rate: SampleRate,
     ) -> Self {
         let tempo_mapping = build_tempo_mapping(&nbs);
-        let note_cache = if let Some(capacity) = cache_capacity {
-            LruCache::new(capacity)
-        } else {
-            LruCache::unbounded()
-        };
+        let audio_provider = NoteAudioProvider::new(8, sample_rate, cache_capacity, audio_provider);
         NbsAudioRenderer {
-            audio_provider,
             nbs,
-            note_cache,
+            audio_provider,
             sample_rate,
             tick: 0,
+            prefetch_tick: 0,
             samples_until_next_tick: 0,
             loop_count: 0,
             current_tempo_index: 0,
@@ -167,30 +160,12 @@ impl NbsAudioRenderer {
 
     pub fn seek_to_tick(&mut self, tick: Tick) {
         self.tick = tick;
+        self.prefetch_tick = tick;
+        self.samples_until_next_tick = 0;
         self.current_tempo_index = self
             .tempo_mapping
             .binary_search_by(|(t, _)| t.cmp(&tick))
             .unwrap_or_else(|e| e);
-    }
-
-    fn note_audio(&mut self, note: &Note, layer: LayerId) -> Option<NoteAudio> {
-        let cache_key = NoteAudioKey::from(*note);
-        let layer = self.nbs.note_blocks.layer(layer);
-        match self.note_cache.get(&cache_key) {
-            Some(cached_audio) => Some(cached_audio.for_note(note, layer)),
-            None => {
-                let audio = NoteAudio::new(
-                    note,
-                    layer,
-                    self.nbs.instrument_set.custom_instrument(note.instrument),
-                    &*self.audio_provider,
-                    self.sample_rate,
-                )?;
-                let playback_audio = audio.for_note(note, layer);
-                self.note_cache.put(cache_key, audio);
-                Some(playback_audio)
-            }
-        }
     }
 
     fn samples_per_tick(&self) -> usize {
@@ -216,7 +191,7 @@ impl Iterator for NbsAudioRenderer {
                         Some(_) => {}
                         None => self.seek_to_tick(looping.start_tick as u32),
                     }
-                } else {
+                } else if self.playing_sounds.is_empty() {
                     return None;
                 }
             }
@@ -224,10 +199,32 @@ impl Iterator for NbsAudioRenderer {
             if self.tick >= self.tempo_mapping[self.current_tempo_index + 1].0 {
                 self.current_tempo_index += 1;
             }
+            while self.audio_provider.prefetched_count() < 256
+                && self.prefetch_tick < self.nbs.note_blocks.ticks_len()
+            {
+                if let Some(notes_in_tick) = self.nbs.note_blocks.notes_at_tick(self.prefetch_tick)
+                {
+                    for (_, note) in notes_in_tick {
+                        let custom_instrument =
+                            self.nbs.instrument_set.custom_instrument(note.instrument);
+                        self.audio_provider.prefetch(*note, custom_instrument);
+                    }
+                }
+                self.prefetch_tick += 1;
+            }
             if let Some(notes_in_tick) = self.nbs.note_blocks.notes_at_tick(self.tick).cloned() {
                 for (layer, note) in notes_in_tick {
-                    if let Some(source) = self.note_audio(&note, layer) {
-                        self.playing_sounds.push(source);
+                    let layer = self.nbs.note_blocks.layer(layer);
+                    let custom_instrument =
+                        self.nbs.instrument_set.custom_instrument(note.instrument);
+                    let audio = self.audio_provider.get(
+                        note,
+                        layer,
+                        custom_instrument,
+                        NoteAudioMissPolicy::Wait(None),
+                    );
+                    if let Some(audio) = audio {
+                        self.playing_sounds.push(audio);
                     }
                 }
             }

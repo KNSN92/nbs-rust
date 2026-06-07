@@ -3,6 +3,7 @@ mod instrument_audio;
 mod note_audio;
 pub mod provider;
 mod renderer;
+mod resample;
 mod vanilla_audio;
 
 use std::num::{NonZeroU16, NonZeroU32};
