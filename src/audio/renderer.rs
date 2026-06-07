@@ -57,7 +57,11 @@ impl NbsAudioRenderer {
         NbsAudioRendererBuilder::new(nbs, sample_rate)
     }
 
-    fn new(
+    pub fn new(nbs: Nbs, sample_rate: SampleRate) -> Self {
+        NbsAudioRendererBuilder::new(nbs, sample_rate).build()
+    }
+
+    fn new_inner(
         nbs: Nbs,
         num_threads: NonZeroUsize,
         audio_provider: Box<dyn InstrumentAudioProvider + Send>,
@@ -321,7 +325,7 @@ impl NbsAudioRendererBuilder {
     }
 
     pub fn build(self) -> NbsAudioRenderer {
-        NbsAudioRenderer::new(
+        NbsAudioRenderer::new_inner(
             self.nbs,
             self.num_threads,
             self.audio_provider,
