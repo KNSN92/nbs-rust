@@ -305,11 +305,6 @@ impl NbsAudioRendererBuilder {
         self
     }
 
-    pub fn sample_rate(mut self, sample_rate: SampleRate) -> Self {
-        self.sample_rate = sample_rate;
-        self
-    }
-
     pub fn audio_provider(
         self,
         audio_provider: impl InstrumentAudioProvider + Send + 'static,
