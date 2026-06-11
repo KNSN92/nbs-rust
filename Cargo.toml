@@ -9,7 +9,7 @@ edition = "2024"
 audio = ["lru", "rubato", "symphonia"]
 midi = ["midly"]
 zip = ["dep:zip"]
-serde = ["serde"]
+serde = ["dep:serde"]
 
 [dependencies]
 byteorder = "1.5.0"
