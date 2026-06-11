@@ -1,6 +1,7 @@
 use std::num::NonZeroU8;
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SongMetadata {
     pub vanilla_instruments: u8,
     pub length: u16,
@@ -10,6 +11,7 @@ pub struct SongMetadata {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SongInfo {
     pub name: String,
     pub author: String,
@@ -18,6 +20,7 @@ pub struct SongInfo {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SongStats {
     pub minutes_spent: u32,
     pub left_clicks: u32,
@@ -27,6 +30,7 @@ pub struct SongStats {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EditorInfo {
     pub time_signature: u8,
     pub auto_saving: AutoSaving,
@@ -34,6 +38,7 @@ pub struct EditorInfo {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Looping {
     pub enabled: bool,
     pub count: Option<NonZeroU8>,
@@ -41,12 +46,14 @@ pub struct Looping {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AutoSaving {
     pub enabled: bool,
     pub duration: u8,
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Header {
     pub song_meta: SongMetadata,
     pub song_info: SongInfo,
