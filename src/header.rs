@@ -1,6 +1,6 @@
 use std::num::NonZeroU8;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SongMetadata {
     pub vanilla_instruments: u8,
     pub length: u16,
@@ -9,7 +9,7 @@ pub struct SongMetadata {
     pub looping: Looping,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SongInfo {
     pub name: String,
     pub author: String,
@@ -17,7 +17,7 @@ pub struct SongInfo {
     pub description: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SongStats {
     pub minutes_spent: u32,
     pub left_clicks: u32,
@@ -26,27 +26,27 @@ pub struct SongStats {
     pub note_blocks_removed: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EditorInfo {
     pub time_signature: u8,
     pub auto_saving: AutoSaving,
     pub midi_schematic_file_name: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Looping {
     pub enabled: bool,
     pub count: Option<NonZeroU8>,
     pub start_tick: u16,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AutoSaving {
     pub enabled: bool,
     pub duration: u8,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Header {
     pub song_meta: SongMetadata,
     pub song_info: SongInfo,
