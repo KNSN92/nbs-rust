@@ -16,6 +16,7 @@ where
     sample_rate: SampleRate,
     miss_policy: NoteAudioMissPolicy,
     audio_provider: NoteAudioProvider,
+    prefetchable_cap: NonZeroUsize,
     tick: Tick,
     prefetch_tick: Tick,
     samples_until_next_tick: usize,
@@ -81,6 +82,7 @@ where
         nbs: P,
         num_threads: NonZeroUsize,
         audio_provider: Box<dyn InstrumentAudioProvider + Send>,
+        prefetchable_cap: NonZeroUsize,
         cache_capacity: Option<NonZeroUsize>,
         sample_rate: SampleRate,
         miss_policy: NoteAudioMissPolicy,
@@ -91,6 +93,7 @@ where
         NbsAudioRenderer {
             nbs,
             audio_provider,
+            prefetchable_cap,
             sample_rate,
             miss_policy,
             tick: 0,
@@ -221,7 +224,7 @@ where
         if self.tick >= self.tempo_mapping[self.current_tempo_index + 1].0 {
             self.current_tempo_index += 1;
         }
-        while self.audio_provider.prefetched_count() < 256
+        while self.audio_provider.prefetched_count() < self.prefetchable_cap.get()
             && self.prefetch_tick < self.nbs.borrow().note_blocks.ticks_len()
         {
             if let Some(notes_in_tick) = self
@@ -305,6 +308,7 @@ where
     num_threads: NonZeroUsize,
     miss_policy: NoteAudioMissPolicy,
     audio_provider: Box<dyn InstrumentAudioProvider + Send>,
+    prefetchable_cap: NonZeroUsize,
     cache_capacity: Option<NonZeroUsize>,
     sample_rate: SampleRate,
 }
@@ -318,6 +322,7 @@ where
             audio_provider: Box::new(VanillaAudioProvider::new(
                 nbs.borrow().instrument_set.vanilla_instrument_count(),
             )),
+            prefetchable_cap: 256.try_into().unwrap(),
             nbs,
             cache_capacity: Some(NonZeroUsize::new(256).unwrap()),
             miss_policy: NoteAudioMissPolicy::SyncFallback,
@@ -346,6 +351,11 @@ where
         self
     }
 
+    pub fn prefetchable_capacity(mut self, capacity: NonZeroUsize) -> Self {
+        self.prefetchable_cap = capacity;
+        self
+    }
+
     pub fn audio_provider(
         mut self,
         audio_provider: impl InstrumentAudioProvider + Send + 'static,
@@ -360,6 +370,7 @@ where
             self.nbs,
             self.num_threads,
             self.audio_provider,
+            self.prefetchable_cap,
             self.cache_capacity,
             self.sample_rate,
             self.miss_policy,
