@@ -347,27 +347,12 @@ where
     }
 
     pub fn audio_provider(
-        self,
+        mut self,
         audio_provider: impl InstrumentAudioProvider + Send + 'static,
-    ) -> NbsAudioRendererBuilder<P> {
-        let NbsAudioRendererBuilder {
-            nbs,
-            cache_capacity,
-            miss_policy,
-            sample_rate,
-            audio_provider: _,
-            num_threads,
-        } = self;
-        let audio_provider =
+    ) -> Self {
+        self.audio_provider =
             Box::new(audio_provider) as Box<dyn InstrumentAudioProvider + Send + 'static>;
-        NbsAudioRendererBuilder {
-            nbs,
-            num_threads,
-            cache_capacity,
-            miss_policy,
-            sample_rate,
-            audio_provider,
-        }
+        self
     }
 
     pub fn build(self) -> NbsAudioRenderer<P> {
