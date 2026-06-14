@@ -1,4 +1,5 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Instrument(pub u8);
 
 pub const VANILLA_INSTRUMENT_COUNT: u8 = 16;
@@ -39,7 +40,8 @@ impl Instrument {
     pub const Pling: Instrument = Instrument(15);
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CustomInstrument {
     pub name: String,
     pub file_name: String,
@@ -58,7 +60,8 @@ impl Default for CustomInstrument {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InstrumentSet {
     custom_instruments: Vec<CustomInstrument>,
     vanilla_instruments: u8,

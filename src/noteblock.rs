@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::{Tick, instrument::Instrument};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Note {
     pub instrument: Instrument,
     pub key: u8,
@@ -28,6 +29,7 @@ pub type NotesInTick = Vec<(LayerId, Note)>;
 pub type NotesInLayer = Vec<(Tick, Note)>;
 
 #[derive(Debug)]
+//TODO: support serde with custom serialize/deserialize to more compact format
 pub struct NoteBlocks {
     len: Tick,
     ticks: Vec<Tick>,
@@ -138,7 +140,8 @@ impl Default for NoteBlocks {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Layer {
     pub name: String,
     pub lock: bool,
