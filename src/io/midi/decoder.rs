@@ -194,8 +194,7 @@ impl Midi2NbsDecoder {
             }
         }
 
-        nbs.header.song_meta.length = nbs.note_blocks.ticks_len() as u16;
-        nbs.header.song_meta.layers = nbs.note_blocks.layer_count();
+        nbs.sync_header();
 
         Ok(nbs)
     }
