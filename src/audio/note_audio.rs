@@ -321,29 +321,30 @@ impl NoteAudioProvider {
             }
             NoteAudioMissPolicy::Wait(timeout) => {
                 if !self.prefetched_audios.contains_key(&key) {
-                    return None;
+                    self.prefetch(note, custom_instrument);
                 }
+                let timeout = timeout.unwrap_or(Duration::MAX);
                 let start = std::time::Instant::now();
-                loop {
-                    while self.prefetching_count > 0 {
-                        match (self.receive_result_blocking(), timeout) {
-                            (Some(recv_key), _) if recv_key == key => break,
-                            (_, Some(timeout)) if start.elapsed() >= timeout => break,
-                            _ => {}
-                        }
+                while self.prefetching_count > 0 {
+                    let recv_key = self.receive_result_blocking(timeout - start.elapsed());
+                    if let Some(recv_key) = recv_key && recv_key == key {
+                        break;
                     }
-                    let audio = match self.get_prefetched(key) {
-                        Some(audio) => audio,
-                        None => return None,
-                    };
-                    let audio = if let Some(audio) = audio {
-                        self.audio_cache.put(key, audio.clone());
-                        Some(NoteAudio::from_frames(audio, note, layer, self.sample_rate))
-                    } else {
-                        None
-                    };
-                    return audio;
+                    if start.elapsed() >= timeout {
+                        return None;
+                    }
                 }
+                let audio = match self.get_prefetched(key) {
+                    Some(audio) => audio,
+                    None => return None,
+                };
+                let audio = if let Some(audio) = audio {
+                    self.audio_cache.put(key, audio.clone());
+                    Some(NoteAudio::from_frames(audio, note, layer, self.sample_rate))
+                } else {
+                    None
+                };
+                return audio;
             }
             NoteAudioMissPolicy::Skip => {
                 self.consume_prefetched(key);
@@ -366,8 +367,8 @@ impl NoteAudioProvider {
         }
     }
 
-    fn receive_result_blocking(&mut self) -> Option<NoteAudioKey> {
-        if let Ok(NoteAudioResampleResult { key, audio }) = self.result_rx.recv() {
+    fn receive_result_blocking(&mut self, timeout: Duration) -> Option<NoteAudioKey> {
+        if let Ok(NoteAudioResampleResult { key, audio }) = self.result_rx.recv_timeout(timeout) {
             self.prefetching_count -= 1;
             if let Some(result) = self.prefetched_audios.get_mut(&key) {
                 result.1 = if let Some(audio) = audio {
