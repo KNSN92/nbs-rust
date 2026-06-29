@@ -1,7 +1,7 @@
 use std::{fs::File, io::Cursor, num::NonZeroU32, sync::Arc, time::Duration};
 
 use crate::audio::{
-    Channels, Frame, Sample, SampleRate,
+    Channels, Frame, SampleRate,
     decoder::{DecodeAudioError, decode_audio},
 };
 
@@ -28,7 +28,7 @@ impl InstrumentAudio {
     }
 
     pub fn new(
-        samples: impl Into<Vec<Sample>>,
+        samples: impl Into<Vec<f32>>,
         channels: Channels,
         sample_rate: SampleRate,
     ) -> Self {
@@ -61,7 +61,7 @@ impl InstrumentAudio {
     }
 }
 
-fn to_stereo(audio: Vec<Sample>, channels: Channels) -> Vec<Frame> {
+fn to_stereo(audio: Vec<f32>, channels: Channels) -> Vec<Frame> {
     let channels = channels.get() as usize;
     let mut frames = Vec::with_capacity(audio.len() / channels * 2);
     for frame in audio.chunks(channels) {

@@ -11,11 +11,8 @@ use lru::LruCache;
 
 use crate::{
     audio::{
-        Float, Frame, InstrumentAudio, SampleRate, provider::InstrumentAudioProvider,
-        resample::resample_audio,
-    },
-    instrument::{CustomInstrument, Instrument},
-    noteblock::{Layer, Note},
+        Frame, InstrumentAudio, SampleRate, provider::InstrumentAudioProvider, resample::resample_audio,
+    }, instrument::{CustomInstrument, Instrument}, noteblock::{Layer, Note},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -48,8 +45,8 @@ impl From<Note> for NoteAudioKey {
 #[derive(Debug, Clone)]
 pub struct NoteAudio {
     frames: Arc<[Frame]>,
-    volume: Float,
-    panning: [Float; 2],
+    volume: f32,
+    panning: [f32; 2],
     sample_rate: SampleRate,
     pos: usize,
 }
@@ -121,17 +118,17 @@ impl NoteAudio {
     }
 }
 
-fn volume(note: &Note, layer: Option<&Layer>) -> Float {
+fn volume(note: &Note, layer: Option<&Layer>) -> f32 {
     let layer_volume = layer
-        .map(|layer| layer.volume as Float / 100.0)
+        .map(|layer| layer.volume as f32 / 100.0)
         .unwrap_or(1.0);
-    let note_volume = note.volume as Float / 100.0;
+    let note_volume = note.volume as f32 / 100.0;
     note_volume * layer_volume
 }
 
-fn panning(note: &Note, layer: Option<&Layer>) -> [Float; 2] {
-    let layer_panning = layer.map(|l| l.panning as Float / 100.0).unwrap_or(0.0);
-    let note_panning = note.panning as Float / 100.0;
+fn panning(note: &Note, layer: Option<&Layer>) -> [f32; 2] {
+    let layer_panning = layer.map(|l| l.panning as f32 / 100.0).unwrap_or(0.0);
+    let note_panning = note.panning as f32 / 100.0;
     let panning = match layer_panning {
         0.0 => note_panning,
         _ => (layer_panning + note_panning) / 2.0,

@@ -15,7 +15,7 @@ use symphonia::{
 };
 use thiserror::Error;
 
-use crate::audio::{Channels, InstrumentAudio, Sample, SampleRate};
+use crate::audio::{Channels, InstrumentAudio, SampleRate};
 
 #[derive(Debug, Error)]
 pub enum DecodeAudioError {
@@ -107,7 +107,7 @@ fn select_track(format: &dyn FormatReader) -> Result<SelectedTrack, DecodeAudioE
 }
 
 struct DecodedAudio {
-    samples: Vec<Sample>,
+    samples: Vec<f32>,
     spec: DecodedAudioSpec,
 }
 
@@ -171,7 +171,7 @@ fn decode_track(
 
 fn append_decoded_audio(
     decoded: AudioBufferRef<'_>,
-    samples: &mut Vec<Sample>,
+    samples: &mut Vec<f32>,
     audio_spec: &mut Option<DecodedAudioSpec>,
 ) -> Result<(), DecodeAudioError> {
     if decoded.frames() == 0 {
