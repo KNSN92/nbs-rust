@@ -1,13 +1,10 @@
 use std::{
-    collections::{HashMap, hash_map::Entry},
-    num::{NonZeroU32, NonZeroUsize},
-    sync::Arc,
-    thread,
-    time::Duration,
+    collections::{HashMap, hash_map::Entry}, mem, num::{NonZeroU32, NonZeroUsize}, sync::Arc, thread, time::Duration,
 };
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use lru::LruCache;
+use wide::f32x16;
 
 use crate::{
     audio::{
@@ -45,8 +42,8 @@ impl From<Note> for NoteAudioKey {
 #[derive(Debug, Clone)]
 pub struct NoteAudio {
     frames: Arc<[Frame]>,
-    volume: f32,
-    panning: [f32; 2],
+    chunk: [Frame; 8],
+    multiplier: f32x16,
     sample_rate: SampleRate,
     pos: usize,
 }
@@ -61,14 +58,12 @@ impl NoteAudio {
     ) -> Option<Self> {
         let audio = provider.get_audio(note.instrument)?;
         let pitch = pitch(note, custom_instrument);
-        let volume = volume(note, layer);
-        let panning = panning(note, layer);
 
         let frames = resample_audio(&audio, pitch, sample_rate)?;
         Some(NoteAudio {
             frames: frames.into(),
-            volume,
-            panning,
+            chunk: [[0.0; 2]; 8],
+            multiplier: multiplier(note, layer),
             sample_rate,
             pos: 0,
         })
@@ -83,8 +78,8 @@ impl NoteAudio {
         let frames = frames.into();
         NoteAudio {
             frames,
-            volume: volume(&note, layer),
-            panning: panning(&note, layer),
+            chunk: [[0.0; 2]; 8],
+            multiplier: multiplier(&note, layer),
             sample_rate,
             pos: 0,
         }
@@ -102,20 +97,20 @@ impl NoteAudio {
     pub fn for_note(&self, note: &Note, layer: Option<&Layer>) -> Self {
         NoteAudio {
             frames: self.frames.clone(),
-            volume: volume(note, layer),
-            panning: panning(note, layer),
+            chunk: [[0.0; 2]; 8],
+            multiplier: multiplier(note, layer),
             sample_rate: self.sample_rate,
             pos: 0,
         }
     }
+}
 
-    #[inline]
-    fn apply_effect(&self, [l, r]: Frame) -> Frame {
-        [
-            l * self.panning[0] * self.volume,
-            r * self.panning[1] * self.volume,
-        ]
-    }
+fn multiplier(note: &Note, layer: Option<&Layer>) -> f32x16 {
+    let volume = volume(note, layer);
+    let panning = panning(note, layer);
+    // Safely transmute the array of 2-element arrays into a 16-element array, since we know the size is correct.
+    let multiplier: [f32; 16] = unsafe { mem::transmute([[panning[0] * volume, panning[1] * volume]; 8]) };
+    f32x16::from(multiplier)
 }
 
 fn volume(note: &Note, layer: Option<&Layer>) -> f32 {
@@ -152,12 +147,21 @@ impl Iterator for NoteAudio {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(frame) = self.frames.get(self.pos) {
-            self.pos += 1;
-            Some(self.apply_effect(*frame))
-        } else {
-            None
+        if self.pos >= self.frames.len() {
+            return None;
         }
+        if self.pos % 8 == 0 {
+            let remaining = self.frames.len() - self.pos;
+            let take = remaining.min(8);
+            let chunk_slice = self.frames[self.pos..self.pos + take].as_flattened();
+            let mut chunk = f32x16::ZERO;
+            chunk.as_mut_array()[..chunk_slice.len()].copy_from_slice(chunk_slice);
+            chunk *= self.multiplier;
+            self.chunk = unsafe { mem::transmute(chunk.to_array()) }; // Transmute the f32x16([f32; 16]) back to [[f32; 2]; 8]
+        }
+        let frame = self.chunk[self.pos % 8];
+        self.pos += 1;
+        Some(frame)
     }
 
     #[inline]
