@@ -3,7 +3,7 @@ use rubato::{
     WindowFunction, audioadapter_buffers::direct::InterleavedSlice, calculate_cutoff,
 };
 
-use crate::audio::{Frame, InstrumentAudio, Sample, SampleRate};
+use crate::audio::{Frame, InstrumentAudio, SampleRate};
 
 pub fn resample_audio(
     audio: &InstrumentAudio,
@@ -31,7 +31,7 @@ pub fn resample_audio(
     };
 
     let mut resampler =
-        Async::<Sample>::new_sinc(resample_ratio, 1.0, &params, 1024, 2, FixedAsync::Input).ok()?;
+        Async::<f32>::new_sinc(resample_ratio, 1.0, &params, 1024, 2, FixedAsync::Input).ok()?;
 
     let expected_output_len = (input_len as f64 * resample_ratio).ceil() as usize;
     let delay = resampler.output_delay();
