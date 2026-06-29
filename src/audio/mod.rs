@@ -12,9 +12,7 @@ pub use instrument_audio::InstrumentAudio;
 pub use note_audio::*;
 pub use renderer::NbsAudioRenderer;
 
-pub type Float = f32;
-pub type Sample = Float;
-pub type Frame = [Sample; 2]; // Nbs sound is stereo, so 2 channels
+pub type Frame = [f32; 2]; // Nbs sound is stereo, so 2 channels
 pub type SampleRate = NonZeroU32;
 pub type Channels = NonZeroU16;
 
