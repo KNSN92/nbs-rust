@@ -1,4 +1,6 @@
-use std::{borrow::Borrow, num::NonZeroUsize, thread, time::Duration};
+use std::{borrow::Borrow, mem, num::NonZeroUsize, thread, time::Duration};
+
+use wide::{f32x8, f32x16};
 
 use crate::{
     Nbs, Tick,
@@ -268,6 +270,35 @@ where
         }
         self.tick += 1;
     }
+
+    fn frame<'a>(&'a mut self) -> Frame {
+        let mut frame_acc = f32x16::from([0.0; 16]);
+        let mut frames = [0.0; 16];
+        let mut frames_filled = 0;
+        self.playing_sounds.retain_mut(|sound| {
+            if let Some([l, r]) = sound.next() {
+                frames[frames_filled] = l;
+                frames[frames_filled + 8] = r;
+                frames_filled = (frames_filled + 1) & 7;
+            }else {
+                return false;
+            }
+            if frames_filled == 0 {
+                frame_acc += f32x16::from(frames);
+                frames = [0.0; 16];
+            }
+            return true;
+        });
+        if frames_filled > 0 {
+            frame_acc += f32x16::from(frames);
+        }
+        let frame_acc = unsafe { mem::transmute::<_, [[f32; 8]; 2]>(frame_acc.to_array()) };
+        let frame = [
+            f32x8::new(frame_acc[0]).reduce_add(),
+            f32x8::new(frame_acc[1]).reduce_add(),
+        ];
+        frame
+    }
 }
 
 impl<P> Iterator for NbsAudioRenderer<P>
@@ -286,17 +317,7 @@ where
         } else {
             self.samples_until_next_tick -= 1;
         }
-        let mut frame = [0.0; 2];
-        self.playing_sounds.retain_mut(|sound| {
-            if let Some(s) = sound.next() {
-                frame[0] += s[0];
-                frame[1] += s[1];
-                true
-            } else {
-                false
-            }
-        });
-        Some(frame)
+        Some(self.frame())
     }
 }
 
