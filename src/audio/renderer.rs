@@ -1,6 +1,6 @@
 use std::{borrow::Borrow, mem, num::NonZeroUsize, thread, time::Duration};
 
-use wide::{f32x8, f32x16};
+use wide::{f32x16};
 
 use crate::{
     Nbs, Tick,
@@ -26,6 +26,8 @@ where
     current_tempo_index: usize,
     tempo_mapping: Vec<(Tick, f32)>,
     playing_sounds: Vec<NoteAudio>,
+    audio_chunk: [Frame; 8],
+    audio_chunk_pos: usize,
 }
 
 fn build_tempo_mapping(nbs: &Nbs) -> Vec<(Tick, f32)> {
@@ -105,6 +107,8 @@ where
             current_tempo_index: 0,
             tempo_mapping,
             playing_sounds: Vec::new(),
+            audio_chunk: [[0.0; 2]; 8],
+            audio_chunk_pos: 0,
         }
     }
 
@@ -272,31 +276,25 @@ where
     }
 
     fn frame<'a>(&'a mut self) -> Frame {
-        let mut frame_acc = f32x16::from([0.0; 16]);
-        let mut frames = [0.0; 16];
-        let mut frames_filled = 0;
-        self.playing_sounds.retain_mut(|sound| {
-            if let Some([l, r]) = sound.next() {
-                frames[frames_filled] = l;
-                frames[frames_filled + 8] = r;
-                frames_filled = (frames_filled + 1) & 7;
-            }else {
-                return false;
-            }
-            if frames_filled == 0 {
-                frame_acc += f32x16::from(frames);
-                frames = [0.0; 16];
-            }
-            return true;
-        });
-        if frames_filled > 0 {
-            frame_acc += f32x16::from(frames);
+        if self.audio_chunk_pos >= 8 {
+            let mut chunk_acc = f32x16::ZERO;
+            self.playing_sounds.retain_mut(|sound| {
+                if let Some(chunk) = sound.next_chunk() {
+                    let chunk = unsafe { mem::transmute::<_, f32x16>(chunk) }; // Transmute the [[f32; 2]; 8] to f32x16([f32; 16])
+                    let chunk = f32x16::from(chunk);
+                    chunk_acc += chunk;
+                    true
+                }else {
+                    false
+                }
+            });
+            let chunk = chunk_acc.to_array();
+            let chunk = unsafe { mem::transmute::<_, [Frame; 8]>(chunk) }; // Transmute the f32x16([f32; 16]) back to [[f32; 2]; 8]
+            self.audio_chunk = chunk;
+            self.audio_chunk_pos = 0;
         }
-        let frame_acc = unsafe { mem::transmute::<_, [[f32; 8]; 2]>(frame_acc.to_array()) };
-        let frame = [
-            f32x8::new(frame_acc[0]).reduce_add(),
-            f32x8::new(frame_acc[1]).reduce_add(),
-        ];
+        let frame = self.audio_chunk[self.audio_chunk_pos];
+        self.audio_chunk_pos += 1;
         frame
     }
 }

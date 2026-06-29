@@ -43,6 +43,7 @@ impl From<Note> for NoteAudioKey {
 pub struct NoteAudio {
     frames: Arc<[Frame]>,
     chunk: [Frame; 8],
+    chunk_pos: usize,
     multiplier: f32x16,
     sample_rate: SampleRate,
     pos: usize,
@@ -63,6 +64,7 @@ impl NoteAudio {
         Some(NoteAudio {
             frames: frames.into(),
             chunk: [[0.0; 2]; 8],
+            chunk_pos: 0,
             multiplier: multiplier(note, layer),
             sample_rate,
             pos: 0,
@@ -79,6 +81,7 @@ impl NoteAudio {
         NoteAudio {
             frames,
             chunk: [[0.0; 2]; 8],
+            chunk_pos: 0,
             multiplier: multiplier(&note, layer),
             sample_rate,
             pos: 0,
@@ -98,10 +101,27 @@ impl NoteAudio {
         NoteAudio {
             frames: self.frames.clone(),
             chunk: [[0.0; 2]; 8],
+            chunk_pos: 0,
             multiplier: multiplier(note, layer),
             sample_rate: self.sample_rate,
             pos: 0,
         }
+    }
+
+    pub fn next_chunk(&mut self) -> Option<[Frame; 8]> {
+        if self.pos >= self.frames.len() {
+            return None;
+        }
+        let remaining = self.frames.len() - self.pos;
+        let take = remaining.min(8);
+        let chunk_slice = self.frames[self.pos..self.pos + take].as_flattened();
+        let mut chunk = f32x16::ZERO;
+        chunk.as_mut_array()[..chunk_slice.len()].copy_from_slice(chunk_slice);
+        chunk *= self.multiplier;
+        let chunk = unsafe { mem::transmute(chunk.to_array()) }; // Transmute the f32x16([f32; 16]) back to [[f32; 2]; 8]
+        self.pos += take;
+        self.chunk_pos = 0;
+        Some(chunk)
     }
 }
 
@@ -150,16 +170,19 @@ impl Iterator for NoteAudio {
         if self.pos >= self.frames.len() {
             return None;
         }
-        if self.pos % 8 == 0 {
+        if self.chunk_pos == 0 {
             let remaining = self.frames.len() - self.pos;
             let take = remaining.min(8);
             let chunk_slice = self.frames[self.pos..self.pos + take].as_flattened();
             let mut chunk = f32x16::ZERO;
             chunk.as_mut_array()[..chunk_slice.len()].copy_from_slice(chunk_slice);
             chunk *= self.multiplier;
-            self.chunk = unsafe { mem::transmute(chunk.to_array()) }; // Transmute the f32x16([f32; 16]) back to [[f32; 2]; 8]
+            let chunk = unsafe { mem::transmute(chunk.to_array()) }; // Transmute the f32x16([f32; 16]) back to [[f32; 2]; 8]
+            self.chunk = chunk;
+            self.chunk_pos = 0;
         }
-        let frame = self.chunk[self.pos % 8];
+        let frame = self.chunk[self.chunk_pos];
+        self.chunk_pos = (self.chunk_pos + 1) & 7;
         self.pos += 1;
         Some(frame)
     }
