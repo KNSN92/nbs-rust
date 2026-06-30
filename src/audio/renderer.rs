@@ -280,8 +280,8 @@ where
             let mut chunk_acc = f32x16::ZERO;
             let mut i = 0;
             while i < self.playing_sounds.len() {
-                if let Some(chunk) = self.playing_sounds[i].next_chunk() {
-                    chunk_acc += f32x16::from(chunk.as_flattened());
+                if let Some(chunk) = self.playing_sounds[i].next_chunk_simd() {
+                    chunk_acc += chunk;
                     i += 1;
                 }else {
                     self.playing_sounds.swap_remove(i);

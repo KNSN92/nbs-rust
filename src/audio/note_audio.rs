@@ -108,18 +108,23 @@ impl NoteAudio {
         }
     }
 
-    pub fn next_chunk(&mut self) -> Option<[Frame; 8]> {
+    pub(crate) fn next_chunk_simd(&mut self) -> Option<f32x16> {
         if self.pos >= self.frames.len() {
             return None;
         }
-        let remaining = self.frames.len() - self.pos;
-        let take = remaining.min(8);
-        let frames_slice = &self.frames[self.pos..self.pos + take];
-        let mut chunk_simd = f32x16::from(frames_slice.as_flattened());
-        chunk_simd *= self.multiplier;
-        let chunk = unsafe { mem::transmute(chunk_simd.to_array()) };
-        self.pos += take;
+        let remaining_frames = self.frames.len() - self.pos;
+        let frames_to_take = remaining_frames.min(8);
+        let frames_slice = &self.frames[self.pos..self.pos + frames_to_take];
+        let frames_slice = frames_slice.as_flattened();
+        let chunk = f32x16::from(frames_slice) * self.multiplier;
+        self.pos += frames_to_take;
         self.chunk_pos = 0;
+        Some(chunk)
+    }
+
+    pub fn next_chunk(&mut self) -> Option<[Frame; 8]> {
+        let chunk = self.next_chunk_simd()?;
+        let chunk = unsafe { mem::transmute(chunk.to_array()) };
         Some(chunk)
     }
 }
@@ -170,13 +175,7 @@ impl Iterator for NoteAudio {
             return None;
         }
         if self.chunk_pos == 0 {
-            let remaining = self.frames.len() - self.pos;
-            let take = remaining.min(8);
-            let frames_slice = &self.frames[self.pos..self.pos + take];
-            let mut chunk_simd = f32x16::from(frames_slice.as_flattened());
-            chunk_simd *= self.multiplier;
-            let chunk = unsafe { mem::transmute(chunk_simd.to_array()) };
-            self.chunk = chunk;
+            self.chunk = self.next_chunk().unwrap();
             self.chunk_pos = 0;
         }
         let frame = self.chunk[self.chunk_pos];
