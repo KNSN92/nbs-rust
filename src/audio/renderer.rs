@@ -278,16 +278,15 @@ where
     fn frame<'a>(&'a mut self) -> Frame {
         if self.audio_chunk_pos >= 8 {
             let mut chunk_acc = f32x16::ZERO;
-            self.playing_sounds.retain_mut(|sound| {
-                if let Some(chunk) = sound.next_chunk() {
-                    let chunk = unsafe { mem::transmute::<_, f32x16>(chunk) }; // Transmute the [[f32; 2]; 8] to f32x16([f32; 16])
-                    let chunk = f32x16::from(chunk);
-                    chunk_acc += chunk;
-                    true
+            let mut i = 0;
+            while i < self.playing_sounds.len() {
+                if let Some(chunk) = self.playing_sounds[i].next_chunk() {
+                    chunk_acc += f32x16::from(chunk.as_flattened());
+                    i += 1;
                 }else {
-                    false
+                    self.playing_sounds.swap_remove(i);
                 }
-            });
+            }
             let chunk = chunk_acc.to_array();
             let chunk = unsafe { mem::transmute::<_, [Frame; 8]>(chunk) }; // Transmute the f32x16([f32; 16]) back to [[f32; 2]; 8]
             self.audio_chunk = chunk;
