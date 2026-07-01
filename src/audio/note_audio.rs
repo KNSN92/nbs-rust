@@ -244,8 +244,8 @@ impl NoteAudioProvider {
 
     pub fn prefetch(&mut self, note: Note, custom_instrument: Option<&CustomInstrument>) {
         let key = NoteAudioKey::from(note);
-        if self.prefetched_audios.contains_key(&key) {
-            self.prefetched_audios.get_mut(&key).unwrap().0 += 1;
+        if let Some((count, _)) = self.prefetched_audios.get_mut(&key) {
+            *count += 1;
             return;
         }
         if let Some(audio) = self.audio_cache.get(&key) {
