@@ -114,13 +114,23 @@ impl NoteAudio {
             return None;
         }
         let frames_to_take = (self.frames.len() - self.pos).min(8);
-        // SAFETY: self.pos is less than self.frames.len(), and self.pos + frames_to_take is always less than or equal to self.frames.len(), so this is safe.
-        let samples_slice = unsafe {
-            let samples_ptr = self.frames.as_ptr().add(self.pos) as *const f32;
-            let samples_to_take = frames_to_take * 2;
-            slice::from_raw_parts(samples_ptr, samples_to_take)
+        let mut chunk = unsafe {
+            let samples_ptr = self.frames.as_ptr().add(self.pos).cast::<f32>();
+            if frames_to_take < 8 {
+                let samples_to_take = frames_to_take * 2;
+                // 残ったフレームの個数が8未満の場合、f32x16にcastするとframes外のメモリを読み込むため、sliceを作ってからf32x16に変換する必要があります。
+                // SAFETY: self.pos + frames_to_take <= self.frames.len()であることが保証されているので、samples_ptrは有効なポインタです。
+                // framesは[f32; 2]の配列なので、それを[f32]に変換するには、frames_to_take * 2の長さのスライスにする必要があります。
+                let samples = slice::from_raw_parts(samples_ptr, samples_to_take);
+                f32x16::from(samples)
+            }else {
+                // SAFETY: f32x16::new関数を見ると分かると思いますが、[f32; 16]をtransmuteしているだけなので、ここでcastしても問題ありません。
+                // また、self.pos + frames_to_take <= self.frames.len()であることが保証されているので、samples_ptrは有効なポインタです。
+                // そして、f32x16はCopyトレイトを実装しているので、後でforgetする必要はありません。(forget書こうとしたらそう注意された...)
+                samples_ptr.cast::<f32x16>().read()
+            }
         };
-        let chunk = f32x16::from(samples_slice) * self.multiplier;
+        chunk *= self.multiplier;
         self.pos += frames_to_take;
         self.chunk_pos = 0;
         Some(chunk)
