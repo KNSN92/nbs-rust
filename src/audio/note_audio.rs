@@ -1,9 +1,5 @@
 use std::{
-    collections::{HashMap, hash_map::Entry},
-    num::{NonZeroU32, NonZeroUsize},
-    sync::Arc,
-    thread,
-    time::Duration,
+    collections::{HashMap, hash_map::Entry}, num::{NonZeroU32, NonZeroUsize}, sync::Arc, thread, time::Duration,
 };
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
@@ -205,6 +201,13 @@ struct NoteAudioResampleResult {
     audio: Option<Arc<[Frame]>>,
 }
 
+enum PrefetchedAudio {
+    Ready(Arc<[Frame]>),
+    Failed,
+    Fetching,
+    NotFound,
+}
+
 impl NoteAudioProvider {
     pub fn new(
         num_threads: NonZeroUsize,
@@ -289,16 +292,12 @@ impl NoteAudioProvider {
         self.receive_results();
         let key = NoteAudioKey::from(note);
         match self.get_prefetched(key) {
-            Some(audio) => {
-                let audio = if let Some(audio) = audio {
+            PrefetchedAudio::Ready(audio) => {
                     self.audio_cache.put(key, audio.clone());
-                    Some(NoteAudio::from_frames(audio, note, layer, self.sample_rate))
-                } else {
-                    None
-                };
-                return audio;
-            }
-            None => {}
+                return Some(NoteAudio::from_frames(audio, note, layer, self.sample_rate));
+            },
+            PrefetchedAudio::Failed => return None,
+            _ => {}
         }
         if let Some(audio) = self.audio_cache.get(&key) {
             let audio = NoteAudio::from_frames(audio.clone(), note, layer, self.sample_rate);
@@ -313,7 +312,9 @@ impl NoteAudioProvider {
                         resample_audio(&audio, pitch, self.sample_rate)?.into();
                     self.audio_cache.put(key, frames.clone());
                     let audio = NoteAudio::from_frames(frames, note, layer, self.sample_rate);
-                    return Some(audio);
+                    Some(audio)
+                }else {
+                    None
                 }
             }
             NoteAudioMissPolicy::Wait(timeout) => {
@@ -332,23 +333,17 @@ impl NoteAudioProvider {
                     }
                 }
                 let audio = match self.get_prefetched(key) {
-                    Some(audio) => audio,
-                    None => return None,
+                    PrefetchedAudio::Ready(audio) => audio,
+                    _ => return None,
                 };
-                let audio = if let Some(audio) = audio {
                     self.audio_cache.put(key, audio.clone());
                     Some(NoteAudio::from_frames(audio, note, layer, self.sample_rate))
-                } else {
-                    None
-                };
-                return audio;
             }
             NoteAudioMissPolicy::Skip => {
                 self.consume_prefetched(key);
-                return None;
+                None
             }
         }
-        None
     }
 
     fn receive_results(&mut self) {
@@ -391,7 +386,7 @@ impl NoteAudioProvider {
         }
     }
 
-    fn get_prefetched(&mut self, key: NoteAudioKey) -> Option<Option<Arc<[Frame]>>> {
+    fn get_prefetched(&mut self, key: NoteAudioKey) -> PrefetchedAudio {
         match self.prefetched_audios.entry(key) {
             Entry::Occupied(mut e) => {
                 let audio = if e.get().0 > 1 {
@@ -402,12 +397,12 @@ impl NoteAudioProvider {
                     e.remove().1
                 };
                 match audio {
-                    NoteAudioWithState::Ready(audio) => Some(Some(audio)),
-                    NoteAudioWithState::Failed => return Some(None),
-                    NoteAudioWithState::Fetching => None,
+                    NoteAudioWithState::Ready(audio) => PrefetchedAudio::Ready(audio),
+                    NoteAudioWithState::Failed => PrefetchedAudio::Failed,
+                    NoteAudioWithState::Fetching => PrefetchedAudio::Fetching,
                 }
             }
-            _ => None,
+            _ => PrefetchedAudio::NotFound,
         }
     }
 }
