@@ -1,3 +1,4 @@
+use core::slice;
 use std::{
     collections::{HashMap, hash_map::Entry}, mem, num::{NonZeroU32, NonZeroUsize}, sync::Arc, thread, time::Duration,
 };
@@ -112,11 +113,14 @@ impl NoteAudio {
         if self.pos >= self.frames.len() {
             return None;
         }
-        let remaining_frames = self.frames.len() - self.pos;
-        let frames_to_take = remaining_frames.min(8);
-        let frames_slice = &self.frames[self.pos..self.pos + frames_to_take];
-        let frames_slice = frames_slice.as_flattened();
-        let chunk = f32x16::from(frames_slice) * self.multiplier;
+        let frames_to_take = (self.frames.len() - self.pos).min(8);
+        // SAFETY: self.pos is less than self.frames.len(), and self.pos + frames_to_take is always less than or equal to self.frames.len(), so this is safe.
+        let samples_slice = unsafe {
+            let samples_ptr = self.frames.as_ptr().add(self.pos) as *const f32;
+            let samples_to_take = frames_to_take * 2;
+            slice::from_raw_parts(samples_ptr, samples_to_take)
+        };
+        let chunk = f32x16::from(samples_slice) * self.multiplier;
         self.pos += frames_to_take;
         self.chunk_pos = 0;
         Some(chunk)
