@@ -172,7 +172,6 @@ pub struct NoteAudioProvider {
     result_rx: Receiver<NoteAudioResampleResult>,
     threads: Vec<thread::JoinHandle<()>>,
 
-    prefetching_count: usize,
     prefetched_audios: HashMap<NoteAudioKey, (usize, NoteAudioWithState)>,
 }
 
@@ -262,15 +261,13 @@ impl NoteAudioProvider {
             return;
         };
         let pitch = pitch(&note, custom_instrument);
-        let is_ok = self
+        let is_err = self
             .task_tx
             .as_ref()
             .unwrap()
             .send(NoteAudioResampleTask { key, pitch, audio })
-            .is_ok();
-        if is_ok {
-            self.prefetching_count += 1;
-        } else {
+            .is_err();
+        if is_err {
             eprintln!("Failed to send note audio resample task");
             return;
         }
@@ -279,7 +276,7 @@ impl NoteAudioProvider {
     }
 
     pub fn prefetched_count(&self) -> usize {
-        self.prefetched_audios.len() + self.prefetching_count
+        self.prefetched_audios.len()
     }
 
     pub fn get(
@@ -323,7 +320,7 @@ impl NoteAudioProvider {
                 }
                 let timeout = timeout.unwrap_or(Duration::MAX);
                 let start = std::time::Instant::now();
-                while self.prefetching_count > 0 {
+                while !self.prefetched_audios.is_empty() {
                     let recv_key = self.receive_result_blocking(timeout - start.elapsed());
                     if let Some(recv_key) = recv_key && recv_key == key {
                         break;
@@ -348,7 +345,6 @@ impl NoteAudioProvider {
 
     fn receive_results(&mut self) {
         while let Ok(NoteAudioResampleResult { key, audio }) = self.result_rx.try_recv() {
-            self.prefetching_count -= 1;
             if let Some(result) = self.prefetched_audios.get_mut(&key) {
                 result.1 = if let Some(audio) = audio {
                     NoteAudioWithState::Ready(audio)
@@ -361,7 +357,6 @@ impl NoteAudioProvider {
 
     fn receive_result_blocking(&mut self, timeout: Duration) -> Option<NoteAudioKey> {
         if let Ok(NoteAudioResampleResult { key, audio }) = self.result_rx.recv_timeout(timeout) {
-            self.prefetching_count -= 1;
             if let Some(result) = self.prefetched_audios.get_mut(&key) {
                 result.1 = if let Some(audio) = audio {
                     NoteAudioWithState::Ready(audio)
