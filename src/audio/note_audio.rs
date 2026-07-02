@@ -1,4 +1,4 @@
-use core::{ptr, slice};
+use core::ptr;
 use std::{
     collections::{HashMap, hash_map::Entry},
     mem,
@@ -113,26 +113,26 @@ impl NoteAudio {
         if self.pos >= self.frames.len() {
             return None;
         }
-        let frames_to_take = (self.frames.len() - self.pos).min(8);
-        let mut chunk = unsafe {
+        let frames_to_take = self.frames.len() - self.pos;
+        let chunk = unsafe {
             let samples_ptr = self.frames.as_ptr().add(self.pos).cast::<f32>();
-            if frames_to_take < 8 {
-                let samples_to_take = frames_to_take * 2;
+            if frames_to_take >= 8 {
+                // SAFETY: frames_to_take == 8, so 16 contiguous f32 samples are in bounds.
+                // The pointer comes from [f32; 2] frames and is not guaranteed to satisfy
+                // f32x16's 64-byte alignment, so this must be an unaligned read.
+                samples_ptr.cast::<f32x16>().read_unaligned()
+            } else {
                 // 残ったフレームの個数が8未満の場合、f32x16にcastするとframes外のメモリを読み込むため、sliceを作ってからf32x16に変換する必要があります。
                 // SAFETY: self.pos + frames_to_take <= self.frames.len()であることが保証されているので、samples_ptrは有効なポインタです。
                 // framesは[f32; 2]の配列なので、それを[f32]に変換するには、frames_to_take * 2の長さのスライスにする必要があります。
-                let samples = slice::from_raw_parts(samples_ptr, samples_to_take);
-                f32x16::from(samples)
-            }else {
-                // SAFETY: f32x16::new関数を見ると分かると思いますが、[f32; 16]をtransmuteしているだけなので、ここでcastしても問題ありません。
-                // また、self.pos + frames_to_take <= self.frames.len()であることが保証されているので、samples_ptrは有効なポインタです。
-                // そして、f32x16はCopyトレイトを実装しているので、後でforgetする必要はありません。(forget書こうとしたらそう注意された...)
-                samples_ptr.cast::<f32x16>().read()
+                let samples_to_take = frames_to_take * 2;
+                let mut chunk = [0.0; 16];
+                ptr::copy_nonoverlapping(samples_ptr, chunk.as_mut_ptr(), samples_to_take);
+                f32x16::from(chunk)
             }
         };
-        chunk *= self.multiplier;
-        self.pos += frames_to_take;
-        Some(chunk)
+        self.pos += 8;
+        Some(chunk * self.multiplier)
     }
 
     pub fn next_chunk(&mut self) -> Option<[Frame; 8]> {
