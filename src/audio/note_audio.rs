@@ -298,6 +298,7 @@ impl NoteAudioProvider {
         }
         if let Some(audio) = self.audio_cache.get(&key) {
             let audio = NoteAudio::from_frames(audio.clone(), note, layer, self.sample_rate);
+            self.consume_prefetched(key);
             return Some(audio);
         }
         match policy {
@@ -326,12 +327,17 @@ impl NoteAudioProvider {
                         break;
                     }
                     if start.elapsed() >= timeout {
+                        self.consume_prefetched(key);
                         return None;
                     }
                 }
                 let audio = match self.get_prefetched(key) {
                     PrefetchedAudio::Ready(audio) => audio,
-                    _ => return None,
+                    PrefetchedAudio::Failed => return None,
+                    _ => {
+                        self.consume_prefetched(key);
+                        return None
+                    },
                 };
                     self.audio_cache.put(key, audio.clone());
                     Some(NoteAudio::from_frames(audio, note, layer, self.sample_rate))
@@ -384,9 +390,11 @@ impl NoteAudioProvider {
     fn get_prefetched(&mut self, key: NoteAudioKey) -> PrefetchedAudio {
         match self.prefetched_audios.entry(key) {
             Entry::Occupied(mut e) => {
-                let audio = if e.get().0 > 1 {
                     let (c, audio) = e.get_mut();
+                let audio = if *c > 1 {
+                    if !matches!(*audio, NoteAudioWithState::Fetching) {
                     *c -= 1;
+                    }
                     audio.clone()
                 } else {
                     e.remove().1
