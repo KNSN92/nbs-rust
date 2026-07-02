@@ -24,6 +24,7 @@ where
     samples_until_next_tick: usize,
     loop_count: u8,
     current_tempo_index: usize,
+    //TODO: TempoMapping構造体に分割したい
     tempo_mapping: Vec<(Tick, f32)>,
     playing_sounds: Vec<NoteAudio>,
     audio_chunk: [Frame; 8],
@@ -200,7 +201,8 @@ where
         self.current_tempo_index = self
             .tempo_mapping
             .binary_search_by(|(t, _)| t.cmp(&tick))
-            .unwrap_or_else(|e| e);
+            .unwrap_or_else(|e| e)
+            .saturating_sub(1);
     }
 
     fn samples_per_tick(&self) -> usize {
