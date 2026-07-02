@@ -275,7 +275,7 @@ where
         self.tick += 1;
     }
 
-    fn frame<'a>(&'a mut self) -> Frame {
+    fn frame(&mut self) -> Frame {
         if self.audio_chunk_pos >= 8 {
             let mut chunk_acc = f32x16::ZERO;
             let mut i = 0;
