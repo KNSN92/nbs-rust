@@ -20,7 +20,7 @@ impl MidiInstrumentSet {
     pub fn new() -> Self {
         MidiInstrumentSet {
             override_instruments: [None; MIDI_INSTRUMENTS.len()],
-            override_drums: [None; MIDI_DRUMS.len()]
+            override_drums: [None; MIDI_DRUMS.len()],
         }
     }
 

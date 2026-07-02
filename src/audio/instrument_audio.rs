@@ -27,11 +27,7 @@ impl InstrumentAudio {
         decode_audio(Cursor::new(data), hint_ext)
     }
 
-    pub fn new(
-        samples: impl Into<Vec<f32>>,
-        channels: Channels,
-        sample_rate: SampleRate,
-    ) -> Self {
+    pub fn new(samples: impl Into<Vec<f32>>, channels: Channels, sample_rate: SampleRate) -> Self {
         let frames = to_stereo(samples.into(), channels).into();
         InstrumentAudio {
             frames,

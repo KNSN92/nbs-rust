@@ -127,7 +127,8 @@ impl Midi2NbsDecoder {
                                 let notes = tracks[track_index].notes.entry(pos).or_default();
                                 notes.push(note);
                                 let note_count = notes.len();
-                                tracks[track_index].height = tracks[track_index].height.max(note_count);
+                                tracks[track_index].height =
+                                    tracks[track_index].height.max(note_count);
                             }
                         }
                         MidiMessage::ProgramChange { program } => {
@@ -208,4 +209,3 @@ fn gcd(mut a: u32, mut b: u32) -> u32 {
     }
     a
 }
-
