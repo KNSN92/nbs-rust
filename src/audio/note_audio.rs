@@ -173,6 +173,33 @@ pub struct NoteAudioProvider {
     threads: Vec<thread::JoinHandle<()>>,
 
     prefetched_audios: HashMap<NoteAudioKey, (usize, NoteAudioWithState)>,
+
+    #[cfg(feature = "audio.debug-cache")]
+    cache_debug: CacheDebug,
+}
+
+#[cfg(feature = "audio.debug-cache")]
+#[derive(Debug, Default, Clone, Copy)]
+pub struct CacheDebug {
+    pub cache_hit_count: usize,
+    pub prefetched_hit_count: usize,
+    pub miss_count: usize,
+}
+
+#[cfg(feature = "audio.debug-cache")]
+impl CacheDebug {
+    pub fn hit_rate(&self) -> f64 {
+        let total = self.cache_hit_count + self.prefetched_hit_count + self.miss_count;
+        if total == 0 {
+            0.0
+        } else {
+            (self.cache_hit_count + self.prefetched_hit_count) as f64 / total as f64
+        }
+    }
+
+    pub fn total(&self) -> usize {
+        self.cache_hit_count + self.prefetched_hit_count + self.miss_count
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -240,6 +267,8 @@ impl NoteAudioProvider {
             result_rx,
             threads,
             prefetched_audios: HashMap::new(),
+            #[cfg(feature = "audio.debug-cache")]
+            cache_debug: CacheDebug::default(),
         }
     }
 
@@ -248,12 +277,15 @@ impl NoteAudioProvider {
         if let Some(audio) = self.audio_cache.get(&key) {
             self.prefetched_audios
                 .insert(key, (1, NoteAudioWithState::Ready(audio.clone())));
+            self.cache_hit();
             return;
         }
         if let Some((count, _)) = self.prefetched_audios.get_mut(&key) {
             *count += 1;
+            self.prefetched_hit();
             return;
         }
+        self.cache_miss();
         let audio = if let Some(audio) = self.provider.get_audio(note.instrument) {
             audio
         } else {
@@ -289,7 +321,7 @@ impl NoteAudioProvider {
         let key = NoteAudioKey::from(note);
         match self.get_prefetched(key) {
             PrefetchedAudio::Ready(audio) => {
-                    self.audio_cache.put(key, audio.clone());
+                self.audio_cache.put(key, audio.clone());
                 return Some(NoteAudio::from_frames(audio, note, layer, self.sample_rate));
             },
             PrefetchedAudio::Failed => return None,
@@ -338,8 +370,8 @@ impl NoteAudioProvider {
                         return None
                     },
                 };
-                    self.audio_cache.put(key, audio.clone());
-                    Some(NoteAudio::from_frames(audio, note, layer, self.sample_rate))
+                self.audio_cache.put(key, audio.clone());
+                Some(NoteAudio::from_frames(audio, note, layer, self.sample_rate))
             }
             NoteAudioMissPolicy::Skip => {
                 self.consume_prefetched(key);
@@ -389,10 +421,10 @@ impl NoteAudioProvider {
     fn get_prefetched(&mut self, key: NoteAudioKey) -> PrefetchedAudio {
         match self.prefetched_audios.entry(key) {
             Entry::Occupied(mut e) => {
-                    let (c, audio) = e.get_mut();
+                let (c, audio) = e.get_mut();
                 let audio = if *c > 1 {
                     if !matches!(*audio, NoteAudioWithState::Fetching) {
-                    *c -= 1;
+                        *c -= 1;
                     }
                     audio.clone()
                 } else {
@@ -406,6 +438,32 @@ impl NoteAudioProvider {
             }
             _ => PrefetchedAudio::NotFound,
         }
+    }
+
+    fn cache_hit(&mut self) {
+        #[cfg(feature = "audio.debug-cache")]
+        {
+            self.cache_debug.cache_hit_count += 1;
+        }
+    }
+
+    fn prefetched_hit(&mut self) {
+        #[cfg(feature = "audio.debug-cache")]
+        {
+            self.cache_debug.prefetched_hit_count += 1;
+        }
+    }
+
+    fn cache_miss(&mut self) {
+        #[cfg(feature = "audio.debug-cache")]
+        {
+            self.cache_debug.miss_count += 1;
+        }
+    }
+
+    #[cfg(feature = "audio.debug-cache")]
+    pub fn cache_debug(&self) -> CacheDebug {
+        self.cache_debug
     }
 }
 

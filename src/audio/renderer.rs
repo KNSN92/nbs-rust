@@ -268,6 +268,11 @@ where
         }
         self.tick += 1;
     }
+
+    #[cfg(feature = "audio.debug-cache")]
+    pub fn cache_debug(&self) -> crate::audio::CacheDebug {
+        self.audio_provider.cache_debug()
+    }
 }
 
 impl<P> Iterator for NbsAudioRenderer<P>
