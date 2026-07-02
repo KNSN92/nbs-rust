@@ -1,9 +1,11 @@
+use core::slice;
 use std::{
-    collections::{HashMap, hash_map::Entry}, num::{NonZeroU32, NonZeroUsize}, sync::Arc, thread, time::Duration,
+    collections::{HashMap, hash_map::Entry}, mem, num::{NonZeroU32, NonZeroUsize}, sync::Arc, thread, time::Duration,
 };
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use lru::LruCache;
+use wide::f32x16;
 
 use crate::{
     audio::{
@@ -41,8 +43,9 @@ impl From<Note> for NoteAudioKey {
 #[derive(Debug, Clone)]
 pub struct NoteAudio {
     frames: Arc<[Frame]>,
-    volume: f32,
-    panning: [f32; 2],
+    chunk: [Frame; 8],
+    chunk_pos: usize,
+    multiplier: f32x16,
     sample_rate: SampleRate,
     pos: usize,
 }
@@ -57,14 +60,13 @@ impl NoteAudio {
     ) -> Option<Self> {
         let audio = provider.get_audio(note.instrument)?;
         let pitch = pitch(note, custom_instrument);
-        let volume = volume(note, layer);
-        let panning = panning(note, layer);
 
         let frames = resample_audio(&audio, pitch, sample_rate)?;
         Some(NoteAudio {
             frames: frames.into(),
-            volume,
-            panning,
+            chunk: [[0.0; 2]; 8],
+            chunk_pos: 0,
+            multiplier: multiplier(note, layer),
             sample_rate,
             pos: 0,
         })
@@ -79,8 +81,9 @@ impl NoteAudio {
         let frames = frames.into();
         NoteAudio {
             frames,
-            volume: volume(&note, layer),
-            panning: panning(&note, layer),
+            chunk: [[0.0; 2]; 8],
+            chunk_pos: 0,
+            multiplier: multiplier(&note, layer),
             sample_rate,
             pos: 0,
         }
@@ -98,20 +101,54 @@ impl NoteAudio {
     pub fn for_note(&self, note: &Note, layer: Option<&Layer>) -> Self {
         NoteAudio {
             frames: self.frames.clone(),
-            volume: volume(note, layer),
-            panning: panning(note, layer),
+            chunk: [[0.0; 2]; 8],
+            chunk_pos: 0,
+            multiplier: multiplier(note, layer),
             sample_rate: self.sample_rate,
             pos: 0,
         }
     }
 
-    #[inline]
-    fn apply_effect(&self, [l, r]: Frame) -> Frame {
-        [
-            l * self.panning[0] * self.volume,
-            r * self.panning[1] * self.volume,
-        ]
+    pub(crate) fn next_chunk_simd(&mut self) -> Option<f32x16> {
+        if self.pos >= self.frames.len() {
+            return None;
+        }
+        let frames_to_take = (self.frames.len() - self.pos).min(8);
+        let mut chunk = unsafe {
+            let samples_ptr = self.frames.as_ptr().add(self.pos).cast::<f32>();
+            if frames_to_take < 8 {
+                let samples_to_take = frames_to_take * 2;
+                // 残ったフレームの個数が8未満の場合、f32x16にcastするとframes外のメモリを読み込むため、sliceを作ってからf32x16に変換する必要があります。
+                // SAFETY: self.pos + frames_to_take <= self.frames.len()であることが保証されているので、samples_ptrは有効なポインタです。
+                // framesは[f32; 2]の配列なので、それを[f32]に変換するには、frames_to_take * 2の長さのスライスにする必要があります。
+                let samples = slice::from_raw_parts(samples_ptr, samples_to_take);
+                f32x16::from(samples)
+            }else {
+                // SAFETY: f32x16::new関数を見ると分かると思いますが、[f32; 16]をtransmuteしているだけなので、ここでcastしても問題ありません。
+                // また、self.pos + frames_to_take <= self.frames.len()であることが保証されているので、samples_ptrは有効なポインタです。
+                // そして、f32x16はCopyトレイトを実装しているので、後でforgetする必要はありません。(forget書こうとしたらそう注意された...)
+                samples_ptr.cast::<f32x16>().read()
+            }
+        };
+        chunk *= self.multiplier;
+        self.pos += frames_to_take;
+        self.chunk_pos = 0;
+        Some(chunk)
     }
+
+    pub fn next_chunk(&mut self) -> Option<[Frame; 8]> {
+        let chunk = self.next_chunk_simd()?;
+        let chunk = unsafe { mem::transmute(chunk.to_array()) };
+        Some(chunk)
+    }
+}
+
+fn multiplier(note: &Note, layer: Option<&Layer>) -> f32x16 {
+    let volume = volume(note, layer);
+    let panning = panning(note, layer);
+    // Safely transmute the array of 2-element arrays into a 16-element array, since we know the size is correct.
+    let multiplier: [f32; 16] = unsafe { mem::transmute([[panning[0] * volume, panning[1] * volume]; 8]) };
+    f32x16::from(multiplier)
 }
 
 fn volume(note: &Note, layer: Option<&Layer>) -> f32 {
@@ -148,12 +185,17 @@ impl Iterator for NoteAudio {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(frame) = self.frames.get(self.pos) {
-            self.pos += 1;
-            Some(self.apply_effect(*frame))
-        } else {
-            None
+        if self.pos >= self.frames.len() {
+            return None;
         }
+        if self.chunk_pos == 0 {
+            self.chunk = self.next_chunk().unwrap();
+            self.chunk_pos = 0;
+        }
+        let frame = self.chunk[self.chunk_pos];
+        self.chunk_pos = (self.chunk_pos + 1) & 7;
+        self.pos += 1;
+        Some(frame)
     }
 
     #[inline]

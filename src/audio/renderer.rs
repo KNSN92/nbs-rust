@@ -1,4 +1,6 @@
-use std::{borrow::Borrow, num::NonZeroUsize, thread, time::Duration};
+use std::{borrow::Borrow, mem, num::NonZeroUsize, thread, time::Duration};
+
+use wide::{f32x16};
 
 use crate::{
     Nbs, Tick,
@@ -24,6 +26,8 @@ where
     current_tempo_index: usize,
     tempo_mapping: Vec<(Tick, f32)>,
     playing_sounds: Vec<NoteAudio>,
+    audio_chunk: [Frame; 8],
+    audio_chunk_pos: usize,
 }
 
 fn build_tempo_mapping(nbs: &Nbs) -> Vec<(Tick, f32)> {
@@ -103,6 +107,8 @@ where
             current_tempo_index: 0,
             tempo_mapping,
             playing_sounds: Vec::new(),
+            audio_chunk: [[0.0; 2]; 8],
+            audio_chunk_pos: 0,
         }
     }
 
@@ -268,6 +274,28 @@ where
         }
         self.tick += 1;
     }
+
+    fn frame<'a>(&'a mut self) -> Frame {
+        if self.audio_chunk_pos >= 8 {
+            let mut chunk_acc = f32x16::ZERO;
+            let mut i = 0;
+            while i < self.playing_sounds.len() {
+                if let Some(chunk) = self.playing_sounds[i].next_chunk_simd() {
+                    chunk_acc += chunk;
+                    i += 1;
+                }else {
+                    self.playing_sounds.swap_remove(i);
+                }
+            }
+            let chunk = chunk_acc.to_array();
+            let chunk = unsafe { mem::transmute::<_, [Frame; 8]>(chunk) }; // Transmute the f32x16([f32; 16]) back to [[f32; 2]; 8]
+            self.audio_chunk = chunk;
+            self.audio_chunk_pos = 0;
+        }
+        let frame = self.audio_chunk[self.audio_chunk_pos];
+        self.audio_chunk_pos += 1;
+        frame
+    }
 }
 
 impl<P> Iterator for NbsAudioRenderer<P>
@@ -286,17 +314,7 @@ where
         } else {
             self.samples_until_next_tick -= 1;
         }
-        let mut frame = [0.0; 2];
-        self.playing_sounds.retain_mut(|sound| {
-            if let Some(s) = sound.next() {
-                frame[0] += s[0];
-                frame[1] += s[1];
-                true
-            } else {
-                false
-            }
-        });
-        Some(frame)
+        Some(self.frame())
     }
 }
 
