@@ -239,7 +239,6 @@ impl NoteAudioProvider {
             task_tx,
             result_rx,
             threads,
-            prefetching_count: 0,
             prefetched_audios: HashMap::new(),
         }
     }
