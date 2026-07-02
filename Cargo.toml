@@ -22,3 +22,10 @@ symphonia = { version = "0.5.5", optional = true }
 thiserror = "2.0.18"
 wide = "1.5.0"
 zip = { version = "0.6.6", optional = true }
+
+[dev-dependencies]
+criterion = { version = "0.8", features = ["html_reports"] }
+
+[[bench]]
+name = "note_audio_bench"
+harness = false
