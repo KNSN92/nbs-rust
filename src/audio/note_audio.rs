@@ -51,8 +51,6 @@ impl From<Note> for NoteAudioKey {
 #[derive(Debug, Clone)]
 pub struct NoteAudio {
     frames: Arc<[Frame]>,
-    chunk: [Frame; 8],
-    chunk_pos: usize,
     multiplier: f32x16,
     sample_rate: SampleRate,
     pos: usize,
@@ -72,8 +70,6 @@ impl NoteAudio {
         let frames = resample_audio(&audio, pitch, sample_rate)?;
         Some(NoteAudio {
             frames: frames.into(),
-            chunk: [[0.0; 2]; 8],
-            chunk_pos: 0,
             multiplier: multiplier(note, layer),
             sample_rate,
             pos: 0,
@@ -89,8 +85,6 @@ impl NoteAudio {
         let frames = frames.into();
         NoteAudio {
             frames,
-            chunk: [[0.0; 2]; 8],
-            chunk_pos: 0,
             multiplier: multiplier(&note, layer),
             sample_rate,
             pos: 0,
@@ -109,8 +103,6 @@ impl NoteAudio {
     pub fn for_note(&self, note: &Note, layer: Option<&Layer>) -> Self {
         NoteAudio {
             frames: self.frames.clone(),
-            chunk: [[0.0; 2]; 8],
-            chunk_pos: 0,
             multiplier: multiplier(note, layer),
             sample_rate: self.sample_rate,
             pos: 0,
@@ -140,7 +132,6 @@ impl NoteAudio {
         };
         chunk *= self.multiplier;
         self.pos += frames_to_take;
-        self.chunk_pos = 0;
         Some(chunk)
     }
 
@@ -194,17 +185,10 @@ impl Iterator for NoteAudio {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        if self.pos >= self.frames.len() {
-            return None;
-        }
-        if self.chunk_pos == 0 {
-            self.chunk = self.next_chunk().unwrap();
-            self.chunk_pos = 0;
-        }
-        let frame = self.chunk[self.chunk_pos];
-        self.chunk_pos = (self.chunk_pos + 1) & 7;
+        let frame = self.frames.get(self.pos).copied()?;
+        let multiplier = self.multiplier.to_array();
         self.pos += 1;
-        Some(frame)
+        Some([frame[0] * multiplier[0], frame[1] * multiplier[1]])
     }
 
     #[inline]
