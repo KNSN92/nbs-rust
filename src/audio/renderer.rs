@@ -1,6 +1,6 @@
 use std::{borrow::Borrow, mem, num::NonZeroUsize, thread, time::Duration};
 
-use wide::{f32x16};
+use wide::f32x16;
 
 use crate::{
     Nbs, Tick,
@@ -283,7 +283,7 @@ where
                 if let Some(chunk) = self.playing_sounds[i].next_chunk_simd() {
                     chunk_acc += chunk;
                     i += 1;
-                }else {
+                } else {
                     self.playing_sounds.swap_remove(i);
                 }
             }

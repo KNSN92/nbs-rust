@@ -1,6 +1,11 @@
-use core::slice;
+use core::{ptr, slice};
 use std::{
-    collections::{HashMap, hash_map::Entry}, mem, num::{NonZeroU32, NonZeroUsize}, sync::Arc, thread, time::Duration,
+    collections::{HashMap, hash_map::Entry},
+    mem,
+    num::{NonZeroU32, NonZeroUsize},
+    sync::Arc,
+    thread,
+    time::Duration,
 };
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
@@ -9,8 +14,11 @@ use wide::f32x16;
 
 use crate::{
     audio::{
-        Frame, InstrumentAudio, SampleRate, provider::InstrumentAudioProvider, resample::resample_audio,
-    }, instrument::{CustomInstrument, Instrument}, noteblock::{Layer, Note},
+        Frame, InstrumentAudio, SampleRate, provider::InstrumentAudioProvider,
+        resample::resample_audio,
+    },
+    instrument::{CustomInstrument, Instrument},
+    noteblock::{Layer, Note},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -147,7 +155,8 @@ fn multiplier(note: &Note, layer: Option<&Layer>) -> f32x16 {
     let volume = volume(note, layer);
     let panning = panning(note, layer);
     // Safely transmute the array of 2-element arrays into a 16-element array, since we know the size is correct.
-    let multiplier: [f32; 16] = unsafe { mem::transmute([[panning[0] * volume, panning[1] * volume]; 8]) };
+    let multiplier: [f32; 16] =
+        unsafe { mem::transmute([[panning[0] * volume, panning[1] * volume]; 8]) };
     f32x16::from(multiplier)
 }
 
@@ -331,9 +340,9 @@ impl NoteAudioProvider {
         let key = NoteAudioKey::from(note);
         match self.get_prefetched(key) {
             PrefetchedAudio::Ready(audio) => {
-                    self.audio_cache.put(key, audio.clone());
+                self.audio_cache.put(key, audio.clone());
                 return Some(NoteAudio::from_frames(audio, note, layer, self.sample_rate));
-            },
+            }
             PrefetchedAudio::Failed => return None,
             _ => {}
         }
@@ -352,7 +361,7 @@ impl NoteAudioProvider {
                     self.audio_cache.put(key, frames.clone());
                     let audio = NoteAudio::from_frames(frames, note, layer, self.sample_rate);
                     Some(audio)
-                }else {
+                } else {
                     None
                 }
             }
@@ -364,7 +373,9 @@ impl NoteAudioProvider {
                 let start = std::time::Instant::now();
                 while !self.prefetched_audios.is_empty() {
                     let recv_key = self.receive_result_blocking(timeout - start.elapsed());
-                    if let Some(recv_key) = recv_key && recv_key == key {
+                    if let Some(recv_key) = recv_key
+                        && recv_key == key
+                    {
                         break;
                     }
                     if start.elapsed() >= timeout {
@@ -377,11 +388,11 @@ impl NoteAudioProvider {
                     PrefetchedAudio::Failed => return None,
                     _ => {
                         self.consume_prefetched(key);
-                        return None
-                    },
+                        return None;
+                    }
                 };
-                    self.audio_cache.put(key, audio.clone());
-                    Some(NoteAudio::from_frames(audio, note, layer, self.sample_rate))
+                self.audio_cache.put(key, audio.clone());
+                Some(NoteAudio::from_frames(audio, note, layer, self.sample_rate))
             }
             NoteAudioMissPolicy::Skip => {
                 self.consume_prefetched(key);
@@ -431,10 +442,10 @@ impl NoteAudioProvider {
     fn get_prefetched(&mut self, key: NoteAudioKey) -> PrefetchedAudio {
         match self.prefetched_audios.entry(key) {
             Entry::Occupied(mut e) => {
-                    let (c, audio) = e.get_mut();
+                let (c, audio) = e.get_mut();
                 let audio = if *c > 1 {
                     if !matches!(*audio, NoteAudioWithState::Fetching) {
-                    *c -= 1;
+                        *c -= 1;
                     }
                     audio.clone()
                 } else {
