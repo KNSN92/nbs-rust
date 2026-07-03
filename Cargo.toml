@@ -28,4 +28,5 @@ criterion = { version = "0.8", features = ["html_reports"] }
 
 [[bench]]
 name = "note_audio_bench"
+required-features = ["audio"]
 harness = false
