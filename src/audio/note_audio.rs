@@ -113,26 +113,26 @@ impl NoteAudio {
         if self.pos >= self.frames.len() {
             return None;
         }
-        let frames_to_take = self.frames.len() - self.pos;
-        let chunk = unsafe {
-            let samples_ptr = self.frames.as_ptr().add(self.pos).cast::<f32>();
-            if frames_to_take >= 8 {
-                // SAFETY: frames_to_take == 8, so 16 contiguous f32 samples are in bounds.
-                // The pointer comes from [f32; 2] frames and is not guaranteed to satisfy
-                // f32x16's 64-byte alignment, so this must be an unaligned read.
-                samples_ptr.cast::<f32x16>().read_unaligned()
+        // 上の条件分岐で弾いているため、アンダーフローする事はない。
+        let remaining_frames = self.frames.len() - self.pos;
+        unsafe {
+            // pos番目以降のframesを指すポインタを取得する。
+            let frames_ptr = self.frames.as_ptr().add(self.pos);
+            self.pos += 8;
+            let chunk = if remaining_frames >= 8 {
+                // 一つのframeは2つのf32の配列であり、remaining_framesは常に8以上であるため、16個の連続したf32サンプルが有効な範囲内にあります。
+                // f32x16は64-byteアライメントが行われているため、read_unalignedを使用する必要がある。
+                frames_ptr.cast::<f32x16>().read_unaligned()
             } else {
-                // 残ったフレームの個数が8未満の場合、f32x16にcastするとframes外のメモリを読み込むため、sliceを作ってからf32x16に変換する必要があります。
-                // SAFETY: self.pos + frames_to_take <= self.frames.len()であることが保証されているので、samples_ptrは有効なポインタです。
-                // framesは[f32; 2]の配列なので、それを[f32]に変換するには、frames_to_take * 2の長さのスライスにする必要があります。
-                let samples_to_take = frames_to_take * 2;
+                // 残ったフレームの個数が8未満の場合、f32x16にcastするとframes外のメモリを読み込むため、足りないフレームを0でパディングした配列として読み込む必要がある。
+                let samples_ptr = frames_ptr.cast::<f32>();
+                let remaining_samples = remaining_frames * 2;
                 let mut chunk = [0.0; 16];
-                ptr::copy_nonoverlapping(samples_ptr, chunk.as_mut_ptr(), samples_to_take);
-                f32x16::from(chunk)
-            }
-        };
-        self.pos += 8;
-        Some(chunk * self.multiplier)
+                ptr::copy_nonoverlapping(samples_ptr, chunk.as_mut_ptr(), remaining_samples);
+                f32x16::new(chunk)
+            };
+            Some(chunk * self.multiplier)
+        }
     }
 
     pub fn next_chunk(&mut self) -> Option<[Frame; 8]> {
@@ -148,7 +148,7 @@ fn multiplier(note: &Note, layer: Option<&Layer>) -> f32x16 {
     // Safely transmute the array of 2-element arrays into a 16-element array, since we know the size is correct.
     let multiplier: [f32; 16] =
         unsafe { mem::transmute([[panning[0] * volume, panning[1] * volume]; 8]) };
-    f32x16::from(multiplier)
+    f32x16::new(multiplier)
 }
 
 fn volume(note: &Note, layer: Option<&Layer>) -> f32 {
