@@ -140,6 +140,10 @@ impl NoteAudio {
         let chunk = unsafe { mem::transmute(chunk.to_array()) };
         Some(chunk)
     }
+
+    pub fn seek(&mut self, pos: usize) {
+        self.pos = pos;
+    }
 }
 
 fn multiplier(note: &Note, layer: Option<&Layer>) -> f32x16 {

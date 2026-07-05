@@ -269,7 +269,8 @@ where
                 let audio =
                     self.audio_provider
                         .get(note, layer, custom_instrument, self.miss_policy);
-                if let Some(audio) = audio {
+                if let Some(mut audio) = audio {
+                    audio.seek(self.audio_chunk_pos);
                     self.playing_sounds.push(audio);
                 }
             }
