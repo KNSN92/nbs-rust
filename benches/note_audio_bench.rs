@@ -21,7 +21,7 @@ fn bench_next_chunk() {
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-    c.bench_function("next_chunk_simd", |b| b.iter(|| bench_next_chunk()));
+    c.bench_function("next_chunk", |b| b.iter(|| bench_next_chunk()));
 }
 
 criterion_group!(benches, criterion_benchmark);
