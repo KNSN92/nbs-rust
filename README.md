@@ -20,8 +20,8 @@ This crate aiming to provide a high-level, easy-to-use I/O interface and manipul
 - [x] Reading NBS files
 - [x] Writing NBS files
 - [x] Audio rendering engine
-- [ ] Midi to NBS conversion [WIP]
-- [ ] Brush up the API and ergonomics
+- [x] Midi to NBS conversion
+- [ ] Brush up the API and ergonomics [WIP]
 - [ ] Documentation and examples
 
 ## License
@@ -49,8 +49,8 @@ NBSファイルを読み書きしたり、それを元に音声を生成した�
 - [x] NBSファイルの読み込み
 - [x] NBSファイルの書き込み
 - [x] オーディオ生成エンジン
-- [ ] MidiからNBSへの変換 [WIP]
-- [ ] APIや使い勝手のブラッシュアップ
+- [x] MidiからNBSへの変換
+- [ ] APIや使い勝手のブラッシュアップ [WIP]
 - [ ] ドキュメントと例の充実
 
 ## ライセンス
