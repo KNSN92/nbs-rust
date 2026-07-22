@@ -293,9 +293,7 @@ impl NoteAudioProvider {
             *count += 1;
             return;
         }
-        let audio = if let Some(audio) = self.provider.get_audio(note.instrument) {
-            audio
-        } else {
+        let Some(audio) = self.provider.get_audio(note.instrument) else {
             return;
         };
         let pitch = pitch(&note, custom_instrument);
@@ -465,9 +463,7 @@ fn worker(
     sample_rate: SampleRate,
 ) {
     loop {
-        let NoteAudioResampleTask { key, pitch, audio } = if let Ok(task) = task_rx.recv() {
-            task
-        } else {
+        let Ok(NoteAudioResampleTask { key, pitch, audio }) = task_rx.recv() else {
             break;
         };
         let audio = resample_audio(&audio, pitch, sample_rate).map(Arc::from);
