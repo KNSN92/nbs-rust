@@ -1,9 +1,16 @@
+use std::sync::{LazyLock, atomic::AtomicUsize};
+
+use crossbeam_channel::{Receiver, Sender, unbounded};
 use rubato::{
     Async, FixedAsync, Indexing, Resampler, SincInterpolationParameters, SincInterpolationType,
     WindowFunction, audioadapter_buffers::direct::InterleavedSlice, calculate_cutoff,
 };
 
 use crate::audio::{Frame, InstrumentAudio, SampleRate};
+
+static RESAMPLER_POOL: LazyLock<(Sender<Async<f32>>, Receiver<Async<f32>>)> = LazyLock::new(unbounded);
+static DEBUG_RESAMPLING_POOL_USAGE_HIT: AtomicUsize = AtomicUsize::new(0);
+static DEBUG_RESAMPLING_POOL_USAGE_MISS: AtomicUsize = AtomicUsize::new(0);
 
 pub fn resample_audio(
     audio: &InstrumentAudio,
@@ -30,8 +37,31 @@ pub fn resample_audio(
         window,
     };
 
-    let mut resampler =
-        Async::<f32>::new_sinc(resample_ratio, 1.0, &params, 1024, 2, FixedAsync::Input).ok()?;
+    let mut resampler = RESAMPLER_POOL.1.try_recv()
+        .map(|mut resampler| {
+            DEBUG_RESAMPLING_POOL_USAGE_HIT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            resampler.reset();
+            resampler.set_resample_ratio(resample_ratio, false).unwrap();
+            resampler
+        })
+        .unwrap_or_else(
+            |_| {
+                DEBUG_RESAMPLING_POOL_USAGE_MISS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                Async::<f32>::new_sinc(
+                    resample_ratio,
+                    200.0,
+                    &params,
+                    1024,
+                    2,
+                    FixedAsync::Input
+                ).unwrap()
+            }
+        );
+    println!(
+        "Resampler pool usage: {} hits, {} misses",
+        DEBUG_RESAMPLING_POOL_USAGE_HIT.load(std::sync::atomic::Ordering::Relaxed),
+        DEBUG_RESAMPLING_POOL_USAGE_MISS.load(std::sync::atomic::Ordering::Relaxed),
+    );
 
     let expected_output_len = (input_len as f64 * resample_ratio).ceil() as usize;
     let delay = resampler.output_delay();
@@ -81,6 +111,7 @@ pub fn resample_audio(
     }
 
     drop(output_audio);
+    RESAMPLER_POOL.0.send(resampler).unwrap();
 
     frames.copy_within(delay..delay + expected_output_len, 0);
     frames.truncate(expected_output_len);
