@@ -126,6 +126,10 @@ where
         self.tempo_mapping[self.current_tempo_index].1
     }
 
+    pub fn playing_sounds_count(&self) -> usize {
+        self.playing_sounds.len()
+    }
+
     pub fn duration(&self) -> Duration {
         let total_ticks = self.nbs.borrow().note_blocks.ticks_len();
         let mut duration_secs = 0.0;
