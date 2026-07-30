@@ -27,8 +27,6 @@ where
     //TODO: TempoMapping構造体に分割したい
     tempo_mapping: Vec<(Tick, f32)>,
     playing_sounds: Vec<NoteAudio>,
-    audio_chunk: [Frame; 8],
-    audio_chunk_pos: usize,
 }
 
 fn build_tempo_mapping(nbs: &Nbs) -> Vec<(Tick, f32)> {
@@ -108,8 +106,6 @@ where
             current_tempo_index: 0,
             tempo_mapping,
             playing_sounds: Vec::new(),
-            audio_chunk: [[0.0; 2]; 8],
-            audio_chunk_pos: 0,
         }
     }
 
@@ -273,8 +269,7 @@ where
                 let audio =
                     self.audio_provider
                         .get(note, layer, custom_instrument, self.miss_policy);
-                if let Some(mut audio) = audio {
-                    audio.seek(self.audio_chunk_pos);
+                if let Some(audio) = audio {
                     self.playing_sounds.push(audio);
                 }
             }
@@ -282,26 +277,33 @@ where
         self.tick += 1;
     }
 
-    fn frame(&mut self) -> Frame {
-        if self.audio_chunk_pos >= 8 {
-            let mut chunk_acc = f32x16::ZERO;
-            let mut i = 0;
-            while i < self.playing_sounds.len() {
-                if let Some(chunk) = self.playing_sounds[i].next_chunk_simd() {
-                    chunk_acc += chunk;
-                    i += 1;
-                } else {
-                    self.playing_sounds.swap_remove(i);
-                }
+    pub fn next_chunk_simd(&mut self) -> Option<f32x16> {
+        if self.samples_until_next_tick == 0 {
+            if self.tick >= self.nbs.borrow().note_blocks.ticks_len() && !self.loop_if_needed() {
+                return None;
             }
-            let chunk = chunk_acc.to_array();
-            let chunk = unsafe { mem::transmute::<_, [Frame; 8]>(chunk) }; // Transmute the f32x16([f32; 16]) back to [[f32; 2]; 8]
-            self.audio_chunk = chunk;
-            self.audio_chunk_pos = 0;
+            self.tick();
+            self.samples_until_next_tick = self.samples_per_tick();
+        } else {
+            self.samples_until_next_tick = self.samples_until_next_tick.saturating_sub(8);
         }
-        let frame = self.audio_chunk[self.audio_chunk_pos];
-        self.audio_chunk_pos += 1;
-        frame
+        let mut chunk_acc = f32x16::ZERO;
+        let mut i = 0;
+        while i < self.playing_sounds.len() {
+            if let Some(chunk) = self.playing_sounds[i].next_chunk_simd() {
+                chunk_acc += chunk;
+                i += 1;
+            } else {
+                self.playing_sounds.swap_remove(i);
+            }
+        }
+        Some(chunk_acc)
+    }
+
+    pub fn next_chunk(&mut self) -> Option<[Frame; 8]> {
+        let chunk_acc = self.next_chunk_simd()?;
+        let chunk = unsafe { mem::transmute(chunk_acc.to_array()) };
+        Some(chunk)
     }
 }
 
@@ -321,7 +323,18 @@ where
         } else {
             self.samples_until_next_tick -= 1;
         }
-        Some(self.frame())
+        let mut frame = [0.0; 2];
+        let mut i = 0;
+        while i < self.playing_sounds.len() {
+            if let Some([l, r]) = self.playing_sounds[i].next() {
+                frame[0] += l;
+                frame[1] += r;
+                i += 1;
+            } else {
+                self.playing_sounds.swap_remove(i);
+            }
+        }
+        Some(frame)
     }
 }
 
