@@ -15,8 +15,9 @@ use wide::f32x16;
 
 use crate::{
     audio::{
-        Frame, InstrumentAudio, SampleRate, provider::InstrumentAudioProvider,
-        resample::resample_audio,
+        Frame, InstrumentAudio, SampleRate,
+        provider::InstrumentAudioProvider,
+        resample::{InterpolationType, resample_audio},
     },
     instrument::{CustomInstrument, Instrument},
     noteblock::{Layer, Note},
@@ -84,10 +85,11 @@ impl NoteAudio {
         custom_instrument: Option<&CustomInstrument>,
         provider: &dyn InstrumentAudioProvider,
         sample_rate: SampleRate,
+        interpolation_type: InterpolationType,
     ) -> Option<Self> {
         let audio = provider.get_audio(note.instrument)?;
         let pitch = pitch(note, custom_instrument);
-        let frames = resample_audio(&audio, pitch, sample_rate)?;
+        let frames = resample_audio(&audio, pitch, sample_rate, interpolation_type)?;
         let frames = Frames::from_vec(frames);
 
         Some(NoteAudio {
@@ -217,6 +219,7 @@ pub struct NoteAudioProvider {
     audio_cache: LruCache<NoteAudioKey, Frames>,
     provider: Box<dyn InstrumentAudioProvider + Send>,
     sample_rate: SampleRate,
+    interpolation_type: InterpolationType,
 
     task_tx: Option<Sender<NoteAudioResampleTask>>,
     result_rx: Receiver<NoteAudioResampleResult>,
@@ -261,6 +264,7 @@ impl NoteAudioProvider {
     pub fn new(
         num_threads: NonZeroUsize,
         sample_rate: SampleRate,
+        interpolation_type: InterpolationType,
         cache_cap: Option<NonZeroUsize>,
         provider: Box<dyn InstrumentAudioProvider + Send>,
     ) -> Self {
@@ -274,7 +278,7 @@ impl NoteAudioProvider {
             let result_tx = result_tx.clone();
             let handle = thread::Builder::new()
                 .name(format!("NoteAudioResampleWorker-{}", i))
-                .spawn(move || worker(task_rx, result_tx, sample_rate))
+                .spawn(move || worker(task_rx, result_tx, sample_rate, interpolation_type))
                 .unwrap();
             threads.push(handle);
         }
@@ -286,6 +290,7 @@ impl NoteAudioProvider {
             audio_cache,
             provider,
             sample_rate,
+            interpolation_type,
             task_tx,
             result_rx,
             threads,
@@ -353,7 +358,8 @@ impl NoteAudioProvider {
                 self.consume_prefetched(key);
                 if let Some(audio) = self.provider.get_audio(note.instrument) {
                     let pitch = pitch(&note, custom_instrument);
-                    let frames = resample_audio(&audio, pitch, self.sample_rate)?;
+                    let frames =
+                        resample_audio(&audio, pitch, self.sample_rate, self.interpolation_type)?;
                     let frames = Frames::from_vec(frames);
                     self.audio_cache.put(key, frames.clone());
                     let audio = NoteAudio::from_frames(frames, note, layer, self.sample_rate);
@@ -472,13 +478,14 @@ fn worker(
     task_rx: Receiver<NoteAudioResampleTask>,
     result_tx: Sender<NoteAudioResampleResult>,
     sample_rate: SampleRate,
+    interpolation_type: InterpolationType,
 ) {
     loop {
         let Ok(NoteAudioResampleTask { key, pitch, audio }) = task_rx.recv() else {
             break;
         };
-        let audio =
-            resample_audio(&audio, pitch, sample_rate).map(|frames| Frames::from_vec(frames));
+        let audio = resample_audio(&audio, pitch, sample_rate, interpolation_type)
+            .map(|frames| Frames::from_vec(frames));
         let _ = result_tx.send(NoteAudioResampleResult { key, audio });
     }
 }

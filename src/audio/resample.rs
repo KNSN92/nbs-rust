@@ -1,90 +1,61 @@
 use rubato::{
-    Async, FixedAsync, Indexing, Resampler, SincInterpolationParameters, SincInterpolationType,
-    WindowFunction, audioadapter_buffers::direct::InterleavedSlice, calculate_cutoff,
+    Async, FixedAsync, PolynomialDegree, Resampler, audioadapter_buffers::direct::InterleavedSlice,
 };
 
 use crate::audio::{Frame, InstrumentAudio, SampleRate};
+
+#[derive(Debug, Clone, Copy)]
+pub enum InterpolationType {
+    Nearest,
+    Linear,
+    Cubic,
+    Quintic,
+    Septic,
+}
+
+impl Into<PolynomialDegree> for InterpolationType {
+    fn into(self) -> PolynomialDegree {
+        match self {
+            InterpolationType::Nearest => PolynomialDegree::Nearest,
+            InterpolationType::Linear => PolynomialDegree::Linear,
+            InterpolationType::Cubic => PolynomialDegree::Cubic,
+            InterpolationType::Quintic => PolynomialDegree::Quintic,
+            InterpolationType::Septic => PolynomialDegree::Septic,
+        }
+    }
+}
 
 pub fn resample_audio(
     audio: &InstrumentAudio,
     pitch: f64,
     sample_rate: SampleRate,
+    interpolation_type: InterpolationType,
 ) -> Option<Vec<Frame>> {
-    let input_len = audio.frame_count();
-    if input_len == 0 {
+    let frame_count = audio.frame_count();
+    if frame_count == 0 {
         return Some(Vec::new());
     }
-
     let resample_ratio = sample_rate.get() as f64 / (audio.sample_rate().get() as f64 * pitch);
-    if !resample_ratio.is_finite() || resample_ratio <= 0.0 {
-        return None;
-    }
-
-    let sinc_len = 64;
-    let window = WindowFunction::BlackmanHarris2;
-    let params = SincInterpolationParameters {
-        sinc_len,
-        f_cutoff: calculate_cutoff::<f32>(sinc_len, window),
-        interpolation: SincInterpolationType::Cubic,
-        oversampling_factor: 128,
-        window,
+    let mut resampler = Async::<f32>::new_poly(
+        resample_ratio,
+        1.0,
+        interpolation_type.into(),
+        1024,
+        2,
+        FixedAsync::Input,
+    )
+    .ok()?;
+    let buf_in = InterleavedSlice::new(audio.frames().as_flattened(), 2, frame_count).ok()?;
+    let buf_out = resampler.process_all(&buf_in, frame_count, None).ok()?;
+    //* fftにチャンネル数を2として設定しているため、buf_outのlen、capともに1/2になる。ptrはFrameにキャストし、Vecとして再構築する。
+    let buf_out = {
+        let (ptr, len, cap) = buf_out.take_data().into_raw_parts();
+        let ptr = ptr as *mut Frame;
+        let len = len / 2;
+        let cap = cap / 2;
+        unsafe { Vec::from_raw_parts(ptr, len, cap) }
     };
-
-    let mut resampler =
-        Async::<f32>::new_sinc(resample_ratio, 1.0, &params, 1024, 2, FixedAsync::Input).ok()?;
-
-    let expected_output_len = (input_len as f64 * resample_ratio).ceil() as usize;
-    let delay = resampler.output_delay();
-    let output_capacity = resampler.process_all_needed_output_len(input_len);
-    let mut frames = vec![[0.0; 2]; output_capacity];
-
-    let input_audio = InterleavedSlice::new(audio.frames().as_flattened(), 2, input_len).ok()?;
-    let mut output_audio =
-        InterleavedSlice::new_mut(frames.as_flattened_mut(), 2, output_capacity).ok()?;
-
-    let mut input_offset = 0;
-    let mut output_offset = 0;
-    let mut input_frames_left = input_len;
-
-    while input_frames_left > 0 {
-        let input_frames_next = resampler.input_frames_next();
-        let partial_len = (input_frames_left < input_frames_next).then_some(input_frames_left);
-        let indexing = Indexing {
-            input_offset,
-            output_offset,
-            partial_len,
-            active_channels_mask: None,
-        };
-        let (input_frames, output_frames) = resampler
-            .process_into_buffer(&input_audio, &mut output_audio, Some(&indexing))
-            .ok()?;
-        let consumed = partial_len.unwrap_or(input_frames).min(input_frames_left);
-        input_offset += consumed;
-        input_frames_left -= consumed;
-        output_offset += output_frames;
-    }
-
-    while output_offset < delay + expected_output_len {
-        let indexing = Indexing {
-            input_offset,
-            output_offset,
-            partial_len: Some(0),
-            active_channels_mask: None,
-        };
-        let (_, output_frames) = resampler
-            .process_into_buffer(&input_audio, &mut output_audio, Some(&indexing))
-            .ok()?;
-        if output_frames == 0 {
-            return None;
-        }
-        output_offset += output_frames;
-    }
-
-    drop(output_audio);
-
-    frames.copy_within(delay..delay + expected_output_len, 0);
-    frames.truncate(expected_output_len);
-    Some(frames)
+    Some(buf_out)
 }
 
 #[cfg(test)]
@@ -107,7 +78,8 @@ mod tests {
 
         let audio = InstrumentAudio::new(samples, channels, source_sample_rate);
         let pitch = 2.0f64.powf(1.0 / 12.0);
-        let frames = resample_audio(&audio, pitch, target_sample_rate).unwrap();
+        let frames =
+            resample_audio(&audio, pitch, target_sample_rate, InterpolationType::Cubic).unwrap();
 
         let first_audible = frames
             .iter()
