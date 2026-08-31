@@ -294,9 +294,7 @@ where
                     self.playing_sounds.swap_remove(i);
                 }
             }
-            let chunk = chunk_acc.to_array();
-            let chunk = unsafe { mem::transmute::<_, [Frame; 8]>(chunk) }; // Transmute the f32x16([f32; 16]) back to [[f32; 2]; 8]
-            self.audio_chunk = chunk;
+            self.audio_chunk = unsafe { mem::transmute(chunk_acc) }; // Transmute the f32x16([f32; 16]) back to [[f32; 2]; 8]
             self.audio_chunk_pos = 0;
         }
         let frame = self.audio_chunk[self.audio_chunk_pos];
