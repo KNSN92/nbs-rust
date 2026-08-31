@@ -1,8 +1,9 @@
-use core::ptr;
 use std::{
     collections::{HashMap, hash_map::Entry},
+    iter::repeat_n,
     mem,
     num::{NonZeroU32, NonZeroUsize},
+    ops::Deref,
     sync::Arc,
     thread,
     time::Duration,
@@ -49,8 +50,28 @@ impl From<Note> for NoteAudioKey {
 }
 
 #[derive(Debug, Clone)]
+struct Frames(usize, Arc<[Frame]>);
+
+impl Frames {
+    pub fn from_vec(mut frames: Vec<Frame>) -> Self {
+        let len = frames.len();
+        //* 8フレーム分のパディングを追加する。これにより、SIMDでの読み取り時に境界チェックを行わずに済む。
+        frames.extend(repeat_n([0.0, 0.0], 8));
+        Frames(len, frames.into())
+    }
+}
+
+impl Deref for Frames {
+    type Target = [Frame];
+
+    fn deref(&self) -> &Self::Target {
+        &self.1[..self.0]
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct NoteAudio {
-    frames: Arc<[Frame]>,
+    frames: Frames,
     multiplier: f32x16,
     sample_rate: SampleRate,
     pos: usize,
@@ -66,23 +87,23 @@ impl NoteAudio {
     ) -> Option<Self> {
         let audio = provider.get_audio(note.instrument)?;
         let pitch = pitch(note, custom_instrument);
-
         let frames = resample_audio(&audio, pitch, sample_rate)?;
+        let frames = Frames::from_vec(frames);
+
         Some(NoteAudio {
-            frames: frames.into(),
+            frames,
             multiplier: multiplier(note, layer),
             sample_rate,
             pos: 0,
         })
     }
 
-    pub fn from_frames(
-        frames: impl Into<Arc<[Frame]>>,
+    fn from_frames(
+        frames: Frames,
         note: Note,
         layer: Option<&Layer>,
         sample_rate: SampleRate,
     ) -> Self {
-        let frames = frames.into();
         NoteAudio {
             frames,
             multiplier: multiplier(&note, layer),
@@ -109,29 +130,19 @@ impl NoteAudio {
         }
     }
 
+    #[inline]
     pub(crate) fn next_chunk_simd(&mut self) -> Option<f32x16> {
         if self.pos >= self.frames.len() {
             return None;
         }
-        // 上の条件分岐で弾いているため、アンダーフローする事はない。
-        let remaining_frames = self.frames.len() - self.pos;
         unsafe {
             // pos番目以降のframesを指すポインタを取得する。
-            let frames_ptr = self.frames.as_ptr().add(self.pos);
+            let frames_ptr = self.frames.as_ptr().add(self.pos).cast::<f32x16>();
             self.pos += 8;
-            let chunk = if remaining_frames >= 8 {
-                // 一つのframeは2つのf32の配列であり、remaining_framesは常に8以上であるため、16個の連続したf32サンプルが有効な範囲内にあります。
-                // f32x16は64-byteアライメントが行われているため、read_unalignedを使用する必要がある。
-                frames_ptr.cast::<f32x16>().read_unaligned()
-            } else {
-                // 残ったフレームの個数が8未満の場合、f32x16にcastするとframes外のメモリを読み込むため、足りないフレームを0でパディングした配列として読み込む必要がある。
-                let samples_ptr = frames_ptr.cast::<f32>();
-                let remaining_samples = remaining_frames * 2;
-                let mut chunk = [0.0; 16];
-                ptr::copy_nonoverlapping(samples_ptr, chunk.as_mut_ptr(), remaining_samples);
-                f32x16::new(chunk)
-            };
-            Some(chunk * self.multiplier)
+            //* 一つのframeは2つのf32の配列であり、framesの最後には8フレーム分のパディングがあるため、16個の連続したf32サンプルが有効な範囲内にあります。
+            //* 上のself.frames.len()はそのパディングの分を含まないため、パディングをframesの一部として扱うことはありません。
+            //* f32x16は64-byteアライメントが行われているため、read_unalignedを使用する必要がある。
+            Some(frames_ptr.read_unaligned() * self.multiplier)
         }
     }
 
@@ -203,7 +214,7 @@ impl Iterator for NoteAudio {
 }
 
 pub struct NoteAudioProvider {
-    audio_cache: LruCache<NoteAudioKey, Arc<[Frame]>>,
+    audio_cache: LruCache<NoteAudioKey, Frames>,
     provider: Box<dyn InstrumentAudioProvider + Send>,
     sample_rate: SampleRate,
 
@@ -223,7 +234,7 @@ pub enum NoteAudioMissPolicy {
 
 #[derive(Debug, Clone)]
 enum NoteAudioWithState {
-    Ready(Arc<[Frame]>),
+    Ready(Frames),
     Failed,
     Fetching,
 }
@@ -236,11 +247,11 @@ struct NoteAudioResampleTask {
 
 struct NoteAudioResampleResult {
     key: NoteAudioKey,
-    audio: Option<Arc<[Frame]>>,
+    audio: Option<Frames>,
 }
 
 enum PrefetchedAudio {
-    Ready(Arc<[Frame]>),
+    Ready(Frames),
     Failed,
     Fetching,
     NotFound,
@@ -342,8 +353,8 @@ impl NoteAudioProvider {
                 self.consume_prefetched(key);
                 if let Some(audio) = self.provider.get_audio(note.instrument) {
                     let pitch = pitch(&note, custom_instrument);
-                    let frames: Arc<[Frame]> =
-                        resample_audio(&audio, pitch, self.sample_rate)?.into();
+                    let frames = resample_audio(&audio, pitch, self.sample_rate)?;
+                    let frames = Frames::from_vec(frames);
                     self.audio_cache.put(key, frames.clone());
                     let audio = NoteAudio::from_frames(frames, note, layer, self.sample_rate);
                     Some(audio)
@@ -466,7 +477,8 @@ fn worker(
         let Ok(NoteAudioResampleTask { key, pitch, audio }) = task_rx.recv() else {
             break;
         };
-        let audio = resample_audio(&audio, pitch, sample_rate).map(Arc::from);
+        let audio =
+            resample_audio(&audio, pitch, sample_rate).map(|frames| Frames::from_vec(frames));
         let _ = result_tx.send(NoteAudioResampleResult { key, audio });
     }
 }
