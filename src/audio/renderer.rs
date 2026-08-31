@@ -5,7 +5,7 @@ use wide::f32x16;
 use crate::{
     Nbs, Tick,
     audio::{
-        Frame, NoteAudio, NoteAudioMissPolicy, NoteAudioProvider, SampleRate,
+        Frame, Frames, NoteAudio, NoteAudioMissPolicy, NoteAudioProvider, SampleRate,
         provider::{InstrumentAudioProvider, VanillaAudioProvider},
         resample::InterpolationType,
     },
@@ -24,12 +24,17 @@ unsafe impl Send for PlayingSound {}
 
 impl PlayingSound {
     pub fn new(note_audio: NoteAudio) -> Self {
-        let frames = Arc::into_raw(note_audio.frames.1);
+        let NoteAudio {
+            frames: Frames(len, frames),
+            multiplier,
+            ..
+        } = note_audio;
+        let frames = Arc::into_raw(frames);
         PlayingSound {
-            frames: frames,
-            len: note_audio.frames.0,
+            frames,
+            len,
+            multiplier,
             pos: 0,
-            multiplier: note_audio.multiplier,
         }
     }
 
