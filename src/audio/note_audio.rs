@@ -130,7 +130,7 @@ impl NoteAudio {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub(crate) fn next_chunk_simd(&mut self) -> Option<f32x16> {
         //* self.frames.0は最後のパディングの長さを含まないため、パディングをframesの一部として境界チェックを行ってしまい、下でバッファオーバーフローが発生する事はない。
         if self.pos >= self.frames.0 {
