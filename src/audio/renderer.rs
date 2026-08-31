@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, mem, num::NonZeroUsize, thread, time::Duration};
+use std::{borrow::Borrow, mem, num::NonZeroUsize, sync::Arc, thread, time::Duration};
 
 use wide::f32x16;
 
@@ -10,6 +10,50 @@ use crate::{
         resample::InterpolationType,
     },
 };
+
+#[derive(Debug)]
+struct PlayingSound {
+    frames: *const [Frame],
+    len: usize,
+    pos: usize,
+    multiplier: f32x16,
+}
+
+//* PlayingSoundはArcの生ポインタであり、スレッド間で安全に送信でき、Arcでラップされている型もSendであるため、実装しても安全です。
+unsafe impl Send for PlayingSound {}
+
+impl PlayingSound {
+    pub fn new(note_audio: NoteAudio) -> Self {
+        let frames = Arc::into_raw(note_audio.frames.1);
+        PlayingSound {
+            frames: frames,
+            len: note_audio.frames.0,
+            pos: 0,
+            multiplier: note_audio.multiplier,
+        }
+    }
+
+    #[inline(always)]
+    pub fn next_chunk_simd(&mut self) -> Option<f32x16> {
+        if self.pos >= self.len {
+            return None;
+        }
+        unsafe {
+            //* self.framesは[Frame]の生ポインタであり、これを*const Frameにキャストして、8つのFrameをf32x16として読み取る事が出来ます。
+            //* self.framesはNoteAudioの内部で最後に8フレーム分のパディングが存在する事が保証されているため、上のself.pos >= self.lenのチェックのみで安全に読み取る事が出来ます。
+            let frames_ptr = (self.frames as *const Frame).add(self.pos).cast::<f32x16>();
+            self.pos += 8;
+            Some(frames_ptr.read_unaligned() * self.multiplier)
+        }
+    }
+}
+
+impl Drop for PlayingSound {
+    fn drop(&mut self) {
+        //* self.framesはArcの生ポインタなので、Arc::from_rawを安全に呼び出す事ができ、Arcの参照カウントを減らす事が出来ます。
+        let _ = unsafe { Arc::from_raw(self.frames) };
+    }
+}
 
 pub struct NbsAudioRenderer<P>
 where
@@ -27,7 +71,7 @@ where
     current_tempo_index: usize,
     //TODO: TempoMapping構造体に分割したい
     tempo_mapping: Vec<(Tick, f32)>,
-    playing_sounds: Vec<NoteAudio>,
+    playing_sounds: Vec<PlayingSound>,
     audio_chunk: [Frame; 8],
     audio_chunk_pos: usize,
 }
@@ -282,7 +326,7 @@ where
                         .get(note, layer, custom_instrument, self.miss_policy);
                 if let Some(mut audio) = audio {
                     audio.seek(self.audio_chunk_pos);
-                    self.playing_sounds.push(audio);
+                    self.playing_sounds.push(PlayingSound::new(audio));
                 }
             }
         }

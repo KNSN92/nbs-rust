@@ -51,7 +51,7 @@ impl From<Note> for NoteAudioKey {
 }
 
 #[derive(Debug, Clone)]
-struct Frames(usize, Arc<[Frame]>);
+pub(crate) struct Frames(pub usize, pub Arc<[Frame]>);
 
 impl Frames {
     pub fn from_vec(mut frames: Vec<Frame>) -> Self {
@@ -72,8 +72,8 @@ impl Deref for Frames {
 
 #[derive(Debug, Clone)]
 pub struct NoteAudio {
-    frames: Frames,
-    multiplier: f32x16,
+    pub(crate) frames: Frames,
+    pub(crate) multiplier: f32x16,
     sample_rate: SampleRate,
     pos: usize,
 }
