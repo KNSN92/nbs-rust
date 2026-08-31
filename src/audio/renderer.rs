@@ -7,6 +7,7 @@ use crate::{
     audio::{
         Frame, NoteAudio, NoteAudioMissPolicy, NoteAudioProvider, SampleRate,
         provider::{InstrumentAudioProvider, VanillaAudioProvider},
+        resample::InterpolationType,
     },
 };
 
@@ -90,11 +91,17 @@ where
         prefetchable_cap: NonZeroUsize,
         cache_capacity: Option<NonZeroUsize>,
         sample_rate: SampleRate,
+        interpolation_type: InterpolationType,
         miss_policy: NoteAudioMissPolicy,
     ) -> Self {
         let tempo_mapping = build_tempo_mapping(nbs.borrow());
-        let audio_provider =
-            NoteAudioProvider::new(num_threads, sample_rate, cache_capacity, audio_provider);
+        let audio_provider = NoteAudioProvider::new(
+            num_threads,
+            sample_rate,
+            interpolation_type,
+            cache_capacity,
+            audio_provider,
+        );
         NbsAudioRenderer {
             nbs,
             audio_provider,
@@ -334,6 +341,7 @@ where
     prefetchable_cap: NonZeroUsize,
     cache_capacity: Option<NonZeroUsize>,
     sample_rate: SampleRate,
+    interpolation_type: InterpolationType,
 }
 
 impl<P> NbsAudioRendererBuilder<P>
@@ -350,6 +358,7 @@ where
             cache_capacity: Some(NonZeroUsize::new(256).unwrap()),
             miss_policy: NoteAudioMissPolicy::SyncFallback,
             sample_rate,
+            interpolation_type: InterpolationType::Cubic,
             num_threads: thread::available_parallelism().unwrap_or(1.try_into().unwrap()),
         }
     }
@@ -361,6 +370,11 @@ where
 
     pub fn miss_policy(mut self, policy: NoteAudioMissPolicy) -> Self {
         self.miss_policy = policy;
+        self
+    }
+
+    pub fn interpolation_type(mut self, interpolation_type: InterpolationType) -> Self {
+        self.interpolation_type = interpolation_type;
         self
     }
 
@@ -396,6 +410,7 @@ where
             self.prefetchable_cap,
             self.cache_capacity,
             self.sample_rate,
+            self.interpolation_type,
             self.miss_policy,
         )
     }

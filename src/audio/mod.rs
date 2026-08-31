@@ -11,6 +11,7 @@ use std::num::{NonZeroU16, NonZeroU32};
 pub use instrument_audio::InstrumentAudio;
 pub use note_audio::*;
 pub use renderer::NbsAudioRenderer;
+pub use resample::InterpolationType;
 
 pub type Frame = [f32; 2]; // Nbs sound is stereo, so 2 channels
 pub type SampleRate = NonZeroU32;
