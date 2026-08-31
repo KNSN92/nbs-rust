@@ -132,15 +132,15 @@ impl NoteAudio {
 
     #[inline]
     pub(crate) fn next_chunk_simd(&mut self) -> Option<f32x16> {
-        if self.pos >= self.frames.len() {
+        //* self.frames.0は最後のパディングの長さを含まないため、パディングをframesの一部として境界チェックを行ってしまい、下でバッファオーバーフローが発生する事はない。
+        if self.pos >= self.frames.0 {
             return None;
         }
         unsafe {
             // pos番目以降のframesを指すポインタを取得する。
-            let frames_ptr = self.frames.as_ptr().add(self.pos).cast::<f32x16>();
+            let frames_ptr = self.frames.1.as_ptr().add(self.pos).cast::<f32x16>();
             self.pos += 8;
-            //* 一つのframeは2つのf32の配列であり、framesの最後には8フレーム分のパディングがあるため、16個の連続したf32サンプルが有効な範囲内にあります。
-            //* 上のself.frames.len()はそのパディングの分を含まないため、パディングをframesの一部として扱うことはありません。
+            //* framesの最後には8フレーム分(f32 * 16個分)のパディングがあるため、上の境界チェックが正しい限り16個の連続したf32サンプルが有効な範囲内にあります。
             //* f32x16は64-byteアライメントが行われているため、read_unalignedを使用する必要がある。
             Some(frames_ptr.read_unaligned() * self.multiplier)
         }
