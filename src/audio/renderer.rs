@@ -1,11 +1,10 @@
-use std::{borrow::Borrow, mem, num::NonZeroUsize, thread};
-
-use wide::f32x16;
+use std::{borrow::Borrow, num::NonZeroUsize, thread};
 
 use crate::{
     Nbs, Tick,
     audio::{
-        Frame, NoteAudio, NoteAudioMissPolicy, NoteAudioProvider, SampleRate,
+        Frame, NoteAudioMissPolicy, NoteAudioProvider, SampleRate,
+        mixer::NoteAudioMixer,
         provider::{InstrumentAudioProvider, VanillaAudioProvider},
         resample::InterpolationType,
         tempo::TempoMap,
@@ -26,9 +25,7 @@ where
     samples_until_next_tick: usize,
     loop_count: u8,
     tempo_map: TempoMap,
-    playing_sounds: Vec<NoteAudio>,
-    audio_chunk: [Frame; 8],
-    audio_chunk_pos: usize,
+    mixer: NoteAudioMixer,
 }
 
 impl<P> NbsAudioRenderer<P>
@@ -82,9 +79,7 @@ where
             samples_until_next_tick: 0,
             loop_count: 0,
             tempo_map,
-            playing_sounds: Vec::new(),
-            audio_chunk: [[0.0; 2]; 8],
-            audio_chunk_pos: 0,
+            mixer: NoteAudioMixer::new(),
         }
     }
 
@@ -102,7 +97,7 @@ where
     }
 
     pub fn playing_sounds_count(&self) -> usize {
-        self.playing_sounds.len()
+        self.mixer.mixed_notes()
     }
 
     //TODO: 曲の長さをDurationで取得する関数を追加したい。
@@ -126,11 +121,11 @@ where
                     self.loop_count += 1;
                     self.seek_to_tick(looping.start_tick as u32);
                 }
-                Some(_) if self.playing_sounds.is_empty() => return false,
+                Some(_) if self.mixer.is_empty() => return false,
                 Some(_) => {}
                 None => self.seek_to_tick(looping.start_tick as u32),
             }
-        } else if self.playing_sounds.is_empty() {
+        } else if self.mixer.is_empty() {
             return false;
         }
         true
@@ -174,33 +169,12 @@ where
                 let audio =
                     self.audio_provider
                         .get(note, layer, custom_instrument, self.miss_policy);
-                if let Some(mut audio) = audio {
-                    audio.seek(self.audio_chunk_pos);
-                    self.playing_sounds.push(audio);
+                if let Some(audio) = audio {
+                    self.mixer.mix_note(audio);
                 }
             }
         }
         self.tick += 1;
-    }
-
-    fn frame(&mut self) -> Frame {
-        if self.audio_chunk_pos >= 8 {
-            let mut chunk_acc = f32x16::ZERO;
-            let mut i = 0;
-            while i < self.playing_sounds.len() {
-                if let Some(chunk) = self.playing_sounds[i].next_chunk_simd() {
-                    chunk_acc += chunk;
-                    i += 1;
-                } else {
-                    self.playing_sounds.swap_remove(i);
-                }
-            }
-            self.audio_chunk = unsafe { mem::transmute(chunk_acc) }; // Transmute the f32x16([f32; 16]) back to [[f32; 2]; 8]
-            self.audio_chunk_pos = 0;
-        }
-        let frame = self.audio_chunk[self.audio_chunk_pos];
-        self.audio_chunk_pos += 1;
-        frame
     }
 }
 
@@ -220,7 +194,7 @@ where
         } else {
             self.samples_until_next_tick -= 1;
         }
-        Some(self.frame())
+        Some(self.mixer.next_frame())
     }
 }
 

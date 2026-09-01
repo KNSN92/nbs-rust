@@ -1,5 +1,6 @@
 mod decoder;
 mod instrument_audio;
+mod mixer;
 mod note_audio;
 pub mod provider;
 mod renderer;
