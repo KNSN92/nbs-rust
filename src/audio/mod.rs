@@ -4,6 +4,7 @@ mod note_audio;
 pub mod provider;
 mod renderer;
 mod resample;
+mod tempo;
 mod vanilla_audio;
 
 use std::num::{NonZeroU16, NonZeroU32};
@@ -12,6 +13,7 @@ pub use instrument_audio::InstrumentAudio;
 pub use note_audio::*;
 pub use renderer::NbsAudioRenderer;
 pub use resample::InterpolationType;
+pub use tempo::TempoMap;
 
 pub type Frame = [f32; 2]; // Nbs sound is stereo, so 2 channels
 pub type SampleRate = NonZeroU32;
