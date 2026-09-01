@@ -1,5 +1,6 @@
 use crate::{Nbs, Tick};
 
+#[derive(Debug, Clone)]
 pub struct TempoMap(Vec<(Tick, f32)>);
 
 impl TempoMap {
