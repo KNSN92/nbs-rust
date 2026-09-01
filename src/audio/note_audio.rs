@@ -17,7 +17,7 @@ use crate::{
     audio::{
         Frame, InstrumentAudio, SampleRate,
         provider::InstrumentAudioProvider,
-        resample::{InterpolationType, resample_audio},
+        resampler::{InterpolationType, resample_audio},
     },
     instrument::{CustomInstrument, Instrument},
     noteblock::{Layer, Note},

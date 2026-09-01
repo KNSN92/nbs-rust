@@ -6,7 +6,7 @@ use crate::{
         Frame, NoteAudioMissPolicy, NoteAudioProvider, SampleRate,
         mixer::NoteAudioMixer,
         provider::{InstrumentAudioProvider, VanillaAudioProvider},
-        resample::InterpolationType,
+        resampler::InterpolationType,
         tempo::TempoMap,
     },
 };
