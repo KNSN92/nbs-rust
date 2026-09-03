@@ -5,11 +5,10 @@ use crate::audio::{
     decoder::{DecodeAudioError, decode_audio},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct InstrumentAudio {
     frames: Arc<[Frame]>, // I'm aiming for multi-threaded audio rendering, so using Arc
     sample_rate: SampleRate,
-    pos: usize,
 }
 
 impl InstrumentAudio {
@@ -32,7 +31,6 @@ impl InstrumentAudio {
         InstrumentAudio {
             frames,
             sample_rate,
-            pos: 0,
         }
     }
 
@@ -70,33 +68,4 @@ fn to_stereo(audio: Vec<f32>, channels: Channels) -> Vec<Frame> {
         frames.push(frame)
     }
     frames
-}
-
-impl Clone for InstrumentAudio {
-    fn clone(&self) -> Self {
-        InstrumentAudio {
-            frames: self.frames.clone(),
-            sample_rate: self.sample_rate,
-            pos: 0,
-        }
-    }
-}
-
-impl Iterator for InstrumentAudio {
-    type Item = Frame;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        let frame = self.frames.get(self.pos).copied();
-        if frame.is_some() {
-            self.pos += 1;
-        }
-        frame
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let remaining = self.frames.len() - self.pos;
-        (remaining, Some(remaining))
-    }
 }
