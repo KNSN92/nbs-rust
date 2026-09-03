@@ -5,7 +5,7 @@ use crate::audio::{
     instrument::InstrumentAudioProvider,
     mixer::NoteAudioMixer,
     note::{CacheCapacity, NoteAudioMissPolicy, NoteAudioProvider, NumThreads},
-    resampler::InterpolationType,
+    resampler::polynomial::InterpolationType,
 };
 
 pub struct NbsAudioRendererParams {

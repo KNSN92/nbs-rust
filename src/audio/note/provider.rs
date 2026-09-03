@@ -11,10 +11,12 @@ use lru::LruCache;
 use crate::{
     audio::{
         SampleRate,
-        instrument::InstrumentAudio,
-        instrument::InstrumentAudioProvider,
+        instrument::{InstrumentAudio, InstrumentAudioProvider},
         note::{Frames, NoteAudio, NoteAudioKey, NoteWeight},
-        resampler::{InterpolationType, resample_audio},
+        resampler::{
+            NoteAudioResampler,
+            polynomial::{InterpolationType, PolynomialResampler},
+        },
     },
     noteblock::Note,
 };
@@ -177,9 +179,11 @@ impl NoteAudioProvider {
                 self.consume_prefetched(key);
                 if let Some(audio) = self.provider.get_audio(note.instrument) {
                     let pitch = note.pitch(weight);
-                    let frames =
-                        resample_audio(&audio, pitch, self.sample_rate, self.interpolation_type)?;
-                    let frames = Frames::from_vec(frames);
+                    let frames = PolynomialResampler::new(self.interpolation_type).resample(
+                        audio,
+                        self.sample_rate,
+                        pitch,
+                    )?;
                     self.audio_cache.put(key, frames.clone());
                     let audio = NoteAudio::new(frames, note, weight, self.sample_rate);
                     Some(audio)
@@ -303,8 +307,8 @@ fn worker(
         let Ok(NoteAudioResampleTask { key, pitch, audio }) = task_rx.recv() else {
             break;
         };
-        let audio = resample_audio(&audio, pitch, sample_rate, interpolation_type)
-            .map(|frames| Frames::from_vec(frames));
+        let audio =
+            PolynomialResampler::new(interpolation_type).resample(audio, sample_rate, pitch);
         let _ = result_tx.send(NoteAudioResampleResult { key, audio });
     }
 }
