@@ -56,4 +56,19 @@ impl NoteAudioMixer {
         }
         frame
     }
+
+    pub fn fill_buffer(&mut self, buf: &mut [Frame]) {
+        let mut i = 0;
+        while i < buf.len() {
+            let remaining = buf.len() - i;
+            if self.pos > 0 || remaining < 8 {
+                buf[i] = self.next_frame();
+                i += 1;
+            } else {
+                let chunk = self.next_chunk();
+                buf[i..i + 8].copy_from_slice(&chunk);
+                i += 8;
+            }
+        }
+    }
 }
