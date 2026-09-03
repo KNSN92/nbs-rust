@@ -7,7 +7,7 @@ use std::{mem, num::NonZeroU32, time::Duration};
 use wide::f32x16;
 
 use crate::{
-    audio::{Frame, Frames, SampleRate},
+    audio::{Frame, Frames},
     instrument::Instrument,
     noteblock::Note,
 };
@@ -43,34 +43,31 @@ impl From<Note> for NoteAudioKey {
 pub struct NoteAudio {
     frames: Frames,
     multiplier: f32x16,
-    sample_rate: SampleRate,
     pos: usize,
 }
 
 impl NoteAudio {
-    pub fn new(frames: Frames, note: Note, weight: NoteWeight, sample_rate: SampleRate) -> Self {
+    pub fn new(frames: Frames, note: Note, weight: NoteWeight) -> Self {
         NoteAudio {
             frames,
             multiplier: multiplier(&note, weight),
-            sample_rate,
             pos: 0,
         }
     }
 
     #[inline]
     pub fn sample_rate(&self) -> NonZeroU32 {
-        self.sample_rate
+        self.frames.sample_rate()
     }
 
     pub fn duration(&self) -> Duration {
-        Duration::from_secs_f64(self.frames.len() as f64 / self.sample_rate.get() as f64)
+        Duration::from_secs_f64(self.frames.len() as f64 / self.sample_rate().get() as f64)
     }
 
     pub fn for_note(&self, note: &Note, weight: NoteWeight) -> Self {
         NoteAudio {
             frames: self.frames.clone(),
             multiplier: multiplier(note, weight),
-            sample_rate: self.sample_rate,
             pos: 0,
         }
     }

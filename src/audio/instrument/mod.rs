@@ -11,10 +11,7 @@ use std::{fs::File, io::Cursor, num::NonZeroU32, time::Duration};
 use crate::audio::{Channels, Frame, Frames, SampleRate};
 
 #[derive(Debug, Clone)]
-pub struct InstrumentAudio {
-    frames: Frames,
-    sample_rate: SampleRate,
-}
+pub struct InstrumentAudio(Frames);
 
 impl InstrumentAudio {
     pub fn from_file(
@@ -32,29 +29,26 @@ impl InstrumentAudio {
     }
 
     pub fn new(samples: &[f32], channels: Channels, sample_rate: SampleRate) -> Self {
-        InstrumentAudio {
-            frames: Frames::from_samples(samples, channels),
-            sample_rate,
-        }
+        InstrumentAudio(Frames::from_samples(samples, channels, sample_rate))
     }
 
     #[inline]
     pub fn sample_rate(&self) -> NonZeroU32 {
-        self.sample_rate
+        self.0.sample_rate()
     }
 
     #[inline]
     pub fn frames(&self) -> &[Frame] {
-        &self.frames
+        &self.0
     }
 
     #[inline]
     pub fn frame_count(&self) -> usize {
-        self.frames.len()
+        self.0.len()
     }
 
     #[inline]
     pub fn duration(&self) -> Duration {
-        Duration::from_secs_f64(self.frames.len() as f64 / self.sample_rate.get() as f64)
+        Duration::from_secs_f64(self.0.len() as f64 / self.0.sample_rate().get() as f64)
     }
 }

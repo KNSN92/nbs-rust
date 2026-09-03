@@ -1,14 +1,14 @@
 use std::{iter::repeat_n, ops::Deref, sync::Arc};
 
-use crate::audio::Channels;
+use crate::audio::{Channels, SampleRate};
 
 pub type Frame = [f32; 2]; // Nbs sound is stereo, so 2 channels
 
 #[derive(Debug, Clone)]
-pub struct Frames(Arc<[Frame]>, usize);
+pub struct Frames(Arc<[Frame]>, usize, SampleRate);
 
 impl Frames {
-    pub fn from_samples(samples: &[f32], channels: Channels) -> Self {
+    pub fn from_samples(samples: &[f32], channels: Channels, sample_rate: SampleRate) -> Self {
         let channels = channels.get() as usize;
         let mut frames = Vec::with_capacity(samples.len().div_ceil(channels) * 2);
         for frame in samples.chunks(channels) {
@@ -20,10 +20,10 @@ impl Frames {
             };
             frames.push(frame)
         }
-        Frames::from_vec(frames)
+        Frames::from_vec(frames, sample_rate)
     }
 
-    pub fn from_vec(mut frames: Vec<Frame>) -> Self {
+    pub fn from_vec(mut frames: Vec<Frame>, sample_rate: SampleRate) -> Self {
         let mut len = frames.len();
         //* 8フレーム分のパディングを追加する。ただし、最後の8フレームがすでに0.0で埋まっている場合はそれを利用し、lenを8減らす。これにより、SIMDでの読み取り時にバッファオーバーフローチェックが不要になる。
         const EMPTY_CHUNK: [Frame; 8] = [[0.0, 0.0]; 8];
@@ -31,7 +31,11 @@ impl Frames {
             Some(&EMPTY_CHUNK) => len -= 8,
             _ => frames.extend(repeat_n([0.0, 0.0], 8)),
         }
-        Frames(frames.into(), len)
+        Frames(frames.into(), len, sample_rate)
+    }
+
+    pub fn sample_rate(&self) -> SampleRate {
+        self.2
     }
 
     pub fn as_raw_parts(&self) -> (*const Frame, usize) {

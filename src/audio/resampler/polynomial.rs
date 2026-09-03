@@ -44,7 +44,7 @@ impl NoteAudioResampler for PolynomialResampler {
     ) -> Option<Frames> {
         let frame_count = audio.frame_count();
         if frame_count == 0 {
-            return Some(Frames::from_vec(Vec::new()));
+            return Some(Frames::from_vec(Vec::new(), sample_rate));
         }
         let resample_ratio = sample_rate.get() as f64 / (audio.sample_rate().get() as f64 * pitch);
         let mut resampler = Async::<f32>::new_poly(
@@ -66,7 +66,7 @@ impl NoteAudioResampler for PolynomialResampler {
             let cap = cap / 2;
             unsafe { Vec::from_raw_parts(ptr, len, cap) }
         };
-        let frames = Frames::from_vec(buf_out);
+        let frames = Frames::from_vec(buf_out, sample_rate);
         Some(frames)
     }
 }
