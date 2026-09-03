@@ -4,8 +4,8 @@ use crate::audio::{
     Frame, NoteStream, NoteStreamEvent, SampleRate,
     instrument::InstrumentAudioProvider,
     mixer::NoteAudioMixer,
-    note::{CacheCapacity, NoteAudioMissPolicy, NoteAudioProvider, NumThreads},
-    resampler::polynomial::InterpolationType,
+    note::{CacheCapacity, NoteAudioMissPolicy, NoteAudioProvider},
+    resampler::{multithreaded::NumThreads, polynomial::InterpolationType},
 };
 
 pub struct NbsAudioRendererParams {

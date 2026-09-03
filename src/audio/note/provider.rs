@@ -1,7 +1,6 @@
 use std::{
     collections::{HashMap, hash_map::Entry},
     num::NonZeroUsize,
-    thread,
     time::Duration,
 };
 
@@ -11,10 +10,11 @@ use lru::LruCache;
 use crate::{
     audio::{
         SampleRate,
-        instrument::{InstrumentAudio, InstrumentAudioProvider},
+        instrument::InstrumentAudioProvider,
         note::{Frames, NoteAudio, NoteAudioKey, NoteWeight},
         resampler::{
-            SyncAudioResampler,
+            AsyncAudioResampler, SyncAudioResampler,
+            multithreaded::{MultithreadedResampler, NumThreads},
             polynomial::{InterpolationType, PolynomialResampler},
         },
     },
@@ -25,11 +25,11 @@ pub struct NoteAudioProvider {
     audio_cache: LruCache<NoteAudioKey, Frames>,
     provider: Box<dyn InstrumentAudioProvider + Send>,
     sample_rate: SampleRate,
-    interpolation_type: InterpolationType,
 
-    task_tx: Option<Sender<NoteAudioResampleTask>>,
-    result_rx: Receiver<NoteAudioResampleResult>,
-    threads: Vec<thread::JoinHandle<()>>,
+    resampler: MultithreadedResampler,
+    result_tx: Sender<(NoteAudioKey, Option<Frames>)>,
+    result_rx: Receiver<(NoteAudioKey, Option<Frames>)>,
+    fallback_resampler: Box<dyn SyncAudioResampler + Send>,
 
     prefetched_audios: HashMap<NoteAudioKey, (usize, NoteAudioWithState)>,
 }
@@ -48,32 +48,11 @@ enum NoteAudioWithState {
     Fetching,
 }
 
-struct NoteAudioResampleTask {
-    key: NoteAudioKey,
-    pitch: f64,
-    audio: InstrumentAudio,
-}
-
-struct NoteAudioResampleResult {
-    key: NoteAudioKey,
-    audio: Option<Frames>,
-}
-
 enum PrefetchedAudio {
     Ready(Frames),
     Failed,
     Fetching,
     NotFound,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct NumThreads(pub NonZeroUsize);
-
-impl Default for NumThreads {
-    fn default() -> Self {
-        let num_threads = thread::available_parallelism().unwrap_or_else(|_| 1.try_into().unwrap());
-        NumThreads(num_threads)
-    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -90,32 +69,22 @@ impl NoteAudioProvider {
         interpolation_type: InterpolationType,
         provider: Box<dyn InstrumentAudioProvider + Send>,
     ) -> Self {
-        let num_threads = num_threads.0.get();
-        let (task_tx, task_rx) = unbounded();
-        let task_tx = Some(task_tx);
-        let (result_tx, result_rx) = unbounded();
-        let mut threads = Vec::with_capacity(num_threads);
-        for i in 0..num_threads {
-            let task_rx = task_rx.clone();
-            let result_tx = result_tx.clone();
-            let handle = thread::Builder::new()
-                .name(format!("NoteAudioResampleWorker-{}", i))
-                .spawn(move || worker(task_rx, result_tx, sample_rate, interpolation_type))
-                .unwrap();
-            threads.push(handle);
-        }
         let audio_cache = match cache_cap {
             CacheCapacity::Bounded(cap) => LruCache::new(cap),
             CacheCapacity::Unbounded => LruCache::unbounded(),
         };
+        let (result_tx, result_rx) = unbounded();
+        let resampler = MultithreadedResampler::new(num_threads, || {
+            PolynomialResampler::new(interpolation_type)
+        });
         Self {
             audio_cache,
             provider,
             sample_rate,
-            interpolation_type,
-            task_tx,
+            resampler,
+            result_tx,
             result_rx,
-            threads,
+            fallback_resampler: Box::new(PolynomialResampler::new(interpolation_type)),
             prefetched_audios: HashMap::new(),
         }
     }
@@ -135,16 +104,15 @@ impl NoteAudioProvider {
             return;
         };
         let pitch = note.pitch(weight);
-        let is_err = self
-            .task_tx
-            .as_ref()
-            .unwrap()
-            .send(NoteAudioResampleTask { key, pitch, audio })
-            .is_err();
-        if is_err {
-            eprintln!("Failed to send note audio resample task");
-            return;
-        }
+        let result_tx = self.result_tx.clone();
+        self.resampler.request_resample(
+            audio.into_inner(),
+            self.sample_rate,
+            pitch,
+            move |audio| {
+                result_tx.send((key, audio)).unwrap();
+            },
+        );
         self.prefetched_audios
             .insert(key, (1, NoteAudioWithState::Fetching));
     }
@@ -179,7 +147,7 @@ impl NoteAudioProvider {
                 self.consume_prefetched(key);
                 if let Some(audio) = self.provider.get_audio(note.instrument) {
                     let pitch = note.pitch(weight);
-                    let frames = PolynomialResampler::new(self.interpolation_type).resample(
+                    let frames = self.fallback_resampler.resample(
                         audio.into_inner(),
                         self.sample_rate,
                         pitch,
@@ -228,7 +196,7 @@ impl NoteAudioProvider {
     }
 
     fn receive_results(&mut self) {
-        while let Ok(NoteAudioResampleResult { key, audio }) = self.result_rx.try_recv() {
+        while let Ok((key, audio)) = self.result_rx.try_recv() {
             if let Some(result) = self.prefetched_audios.get_mut(&key) {
                 result.1 = if let Some(audio) = audio {
                     NoteAudioWithState::Ready(audio)
@@ -240,7 +208,7 @@ impl NoteAudioProvider {
     }
 
     fn receive_result_blocking(&mut self, timeout: Duration) -> Option<NoteAudioKey> {
-        if let Ok(NoteAudioResampleResult { key, audio }) = self.result_rx.recv_timeout(timeout) {
+        if let Ok((key, audio)) = self.result_rx.recv_timeout(timeout) {
             if let Some(result) = self.prefetched_audios.get_mut(&key) {
                 result.1 = if let Some(audio) = audio {
                     NoteAudioWithState::Ready(audio)
@@ -285,33 +253,5 @@ impl NoteAudioProvider {
             }
             _ => PrefetchedAudio::NotFound,
         }
-    }
-}
-
-impl Drop for NoteAudioProvider {
-    fn drop(&mut self) {
-        self.task_tx.take();
-        for handle in self.threads.drain(..) {
-            let _ = handle.join();
-        }
-    }
-}
-
-fn worker(
-    task_rx: Receiver<NoteAudioResampleTask>,
-    result_tx: Sender<NoteAudioResampleResult>,
-    sample_rate: SampleRate,
-    interpolation_type: InterpolationType,
-) {
-    loop {
-        let Ok(NoteAudioResampleTask { key, pitch, audio }) = task_rx.recv() else {
-            break;
-        };
-        let audio = PolynomialResampler::new(interpolation_type).resample(
-            audio.into_inner(),
-            sample_rate,
-            pitch,
-        );
-        let _ = result_tx.send(NoteAudioResampleResult { key, audio });
     }
 }

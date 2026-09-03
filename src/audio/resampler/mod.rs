@@ -1,3 +1,4 @@
+pub mod multithreaded;
 pub mod polynomial;
 
 use std::thread;
