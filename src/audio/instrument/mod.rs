@@ -51,4 +51,8 @@ impl InstrumentAudio {
     pub fn duration(&self) -> Duration {
         Duration::from_secs_f64(self.0.len() as f64 / self.0.sample_rate().get() as f64)
     }
+
+    pub fn into_inner(self) -> Frames {
+        self.0
+    }
 }

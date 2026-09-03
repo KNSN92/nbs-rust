@@ -1,14 +1,9 @@
 pub mod polynomial;
 
-use crate::audio::{Frames, SampleRate, instrument::InstrumentAudio};
+use crate::audio::{Frames, SampleRate};
 
 pub trait NoteAudioResampler {
-    fn resample(
-        &self,
-        audio: InstrumentAudio,
-        sample_rate: SampleRate,
-        pitch: f64,
-    ) -> Option<Frames>;
+    fn resample(&self, frames: Frames, sample_rate: SampleRate, pitch: f64) -> Option<Frames>;
 }
 
 #[cfg(test)]

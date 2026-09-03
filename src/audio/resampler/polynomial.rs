@@ -2,9 +2,7 @@ use rubato::{
     Async, FixedAsync, PolynomialDegree, Resampler, audioadapter_buffers::direct::InterleavedSlice,
 };
 
-use crate::audio::{
-    Frame, Frames, SampleRate, instrument::InstrumentAudio, resampler::NoteAudioResampler,
-};
+use crate::audio::{Frame, Frames, SampleRate, resampler::NoteAudioResampler};
 
 #[derive(Debug, Clone, Copy)]
 pub enum InterpolationType {
@@ -36,17 +34,12 @@ impl PolynomialResampler {
 }
 
 impl NoteAudioResampler for PolynomialResampler {
-    fn resample(
-        &self,
-        audio: InstrumentAudio,
-        sample_rate: SampleRate,
-        pitch: f64,
-    ) -> Option<Frames> {
-        let frame_count = audio.frame_count();
+    fn resample(&self, frames: Frames, sample_rate: SampleRate, pitch: f64) -> Option<Frames> {
+        let frame_count = frames.len();
         if frame_count == 0 {
             return Some(Frames::from_vec(Vec::new(), sample_rate));
         }
-        let resample_ratio = sample_rate.get() as f64 / (audio.sample_rate().get() as f64 * pitch);
+        let resample_ratio = sample_rate.get() as f64 / (frames.sample_rate().get() as f64 * pitch);
         let mut resampler = Async::<f32>::new_poly(
             resample_ratio,
             1.0,
@@ -56,7 +49,7 @@ impl NoteAudioResampler for PolynomialResampler {
             FixedAsync::Input,
         )
         .ok()?;
-        let buf_in = InterleavedSlice::new(audio.frames().as_flattened(), 2, frame_count).ok()?;
+        let buf_in = InterleavedSlice::new(frames.as_flattened(), 2, frame_count).ok()?;
         let buf_out = resampler.process_all(&buf_in, frame_count, None).ok()?;
         //* fftにチャンネル数を2として設定しているため、buf_outのlen、capともに1/2になる。ptrはFrameにキャストし、Vecとして再構築する。
         let buf_out = {

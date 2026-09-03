@@ -180,7 +180,7 @@ impl NoteAudioProvider {
                 if let Some(audio) = self.provider.get_audio(note.instrument) {
                     let pitch = note.pitch(weight);
                     let frames = PolynomialResampler::new(self.interpolation_type).resample(
-                        audio,
+                        audio.into_inner(),
                         self.sample_rate,
                         pitch,
                     )?;
@@ -307,8 +307,11 @@ fn worker(
         let Ok(NoteAudioResampleTask { key, pitch, audio }) = task_rx.recv() else {
             break;
         };
-        let audio =
-            PolynomialResampler::new(interpolation_type).resample(audio, sample_rate, pitch);
+        let audio = PolynomialResampler::new(interpolation_type).resample(
+            audio.into_inner(),
+            sample_rate,
+            pitch,
+        );
         let _ = result_tx.send(NoteAudioResampleResult { key, audio });
     }
 }
