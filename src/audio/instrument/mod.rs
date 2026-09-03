@@ -8,7 +8,7 @@ pub use vanilla::VANILLA_AUDIOS;
 
 use std::{fs::File, io::Cursor, num::NonZeroU32, sync::Arc, time::Duration};
 
-use crate::audio::{Channels, Frame, SampleRate};
+use crate::audio::{Channels, Frame, SampleRate, to_stereo};
 
 #[derive(Debug, Clone)]
 pub struct InstrumentAudio {
@@ -58,19 +58,4 @@ impl InstrumentAudio {
     pub fn duration(&self) -> Duration {
         Duration::from_secs_f64(self.frames.len() as f64 / self.sample_rate.get() as f64)
     }
-}
-
-fn to_stereo(audio: Vec<f32>, channels: Channels) -> Vec<Frame> {
-    let channels = channels.get() as usize;
-    let mut frames = Vec::with_capacity(audio.len() / channels * 2);
-    for frame in audio.chunks(channels) {
-        let frame = match frame {
-            [s] => [*s, *s],
-            [l, r] => [*l, *r],
-            [l, r, ..] => [*l, *r],
-            [] => break,
-        };
-        frames.push(frame)
-    }
-    frames
 }

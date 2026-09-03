@@ -1,3 +1,4 @@
+mod frame;
 pub mod instrument;
 mod mixer;
 pub mod note;
@@ -8,11 +9,11 @@ mod tempo;
 
 use std::num::{NonZeroU16, NonZeroU32};
 
+pub use frame::*;
 pub use renderer::*;
 pub use stream::*;
 pub use tempo::TempoMap;
 
-pub type Frame = [f32; 2]; // Nbs sound is stereo, so 2 channels
 pub type SampleRate = NonZeroU32;
 pub type Channels = NonZeroU16;
 

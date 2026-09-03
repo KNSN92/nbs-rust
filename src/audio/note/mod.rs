@@ -2,12 +2,12 @@ mod provider;
 
 pub use provider::*;
 
-use std::{iter::repeat_n, mem, num::NonZeroU32, ops::Deref, sync::Arc, time::Duration};
+use std::{mem, num::NonZeroU32, time::Duration};
 
 use wide::f32x16;
 
 use crate::{
-    audio::{Frame, SampleRate},
+    audio::{Frame, Frames, SampleRate},
     instrument::Instrument,
     noteblock::Note,
 };
@@ -36,30 +36,6 @@ impl From<Note> for NoteAudioKey {
             key: note.key,
             pitch: note.pitch,
         }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Frames(usize, Arc<[Frame]>);
-
-impl Frames {
-    pub fn from_vec(mut frames: Vec<Frame>) -> Self {
-        let mut len = frames.len();
-        //* 8フレーム分のパディングを追加する。ただし、最後の8フレームがすでに0.0で埋まっている場合はそれを利用し、lenを8減らす。これにより、SIMDでの読み取り時にバッファオーバーフローチェックが不要になる。
-        const EMPTY_CHUNK: [Frame; 8] = [[0.0, 0.0]; 8];
-        match frames.last_chunk::<8>() {
-            Some(&EMPTY_CHUNK) => len -= 8,
-            _ => frames.extend(repeat_n([0.0, 0.0], 8)),
-        }
-        Frames(len, frames.into())
-    }
-}
-
-impl Deref for Frames {
-    type Target = [Frame];
-
-    fn deref(&self) -> &Self::Target {
-        &self.1[..self.0]
     }
 }
 
@@ -101,13 +77,14 @@ impl NoteAudio {
 
     #[inline(always)]
     pub(crate) fn next_chunk_simd(&mut self) -> Option<f32x16> {
-        //* self.frames.0は最後のパディングの長さを含まないため、パディングをframesの一部として境界チェックを行ってしまい、下でバッファオーバーフローが発生する事はない。
-        if self.pos >= self.frames.0 {
+        let (frames_ptr, len) = self.frames.as_raw_parts();
+        //* lenは最後のパディングの長さを含まないため、パディングをframesの一部として境界チェックを行ってしまい、下でバッファオーバーフローが発生する事はない。
+        if self.pos >= len {
             return None;
         }
         unsafe {
             // pos番目以降のframesを指すポインタを取得する。
-            let frames_ptr = self.frames.1.as_ptr().add(self.pos).cast::<f32x16>();
+            let frames_ptr = frames_ptr.add(self.pos).cast::<f32x16>();
             self.pos += 8;
             //* framesの最後には8フレーム分(f32 * 16個分)のパディングがあるため、上の境界チェックが正しい限り16個の連続したf32サンプルが有効な範囲内にあります。
             //* f32x16は64-byteアライメントが行われているため、read_unalignedを使用する必要がある。
