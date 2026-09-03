@@ -1,57 +1,59 @@
-use std::{borrow::Borrow, num::NonZeroUsize, thread};
+use std::{num::NonZeroUsize, thread};
 
 use crate::{
-    Nbs, Tick,
     audio::{
-        Frame, NoteAudioMissPolicy, NoteAudioProvider, SampleRate,
+        Frame, NoteAudioMissPolicy, NoteAudioProvider, NoteStream, NoteStreamEvent, SampleRate,
         mixer::NoteAudioMixer,
         provider::{InstrumentAudioProvider, VanillaAudioProvider},
         resampler::InterpolationType,
-        tempo::TempoMap,
     },
+    instrument::InstrumentSet,
 };
 
-pub struct NbsAudioRenderer<P>
+pub struct NbsAudioRenderer<T>
 where
-    P: Borrow<Nbs>,
+    T: NoteStream,
 {
-    nbs: P,
+    note_stream: Option<T>,
     sample_rate: SampleRate,
     miss_policy: NoteAudioMissPolicy,
     audio_provider: NoteAudioProvider,
     prefetchable_cap: NonZeroUsize,
-    tick: Tick,
-    prefetch_tick: Tick,
+    prefetch_note_stream: Option<T>,
     samples_until_next_tick: usize,
-    loop_count: u8,
-    tempo_map: TempoMap,
+    tempo: f32,
     mixer: NoteAudioMixer,
 }
 
-impl<P> NbsAudioRenderer<P>
+impl<T> NbsAudioRenderer<T>
 where
-    P: Borrow<Nbs>,
+    T: NoteStream,
 {
-    pub fn builder(nbs: P, sample_rate: SampleRate) -> NbsAudioRendererBuilder<P> {
-        NbsAudioRendererBuilder::new(nbs, sample_rate)
+    pub fn builder(
+        note_stream: T,
+        instrument_set: &InstrumentSet,
+        sample_rate: SampleRate,
+    ) -> NbsAudioRendererBuilder<T> {
+        NbsAudioRendererBuilder::new(note_stream, instrument_set, sample_rate)
     }
 
-    pub fn new(nbs: P, sample_rate: SampleRate) -> Self {
-        NbsAudioRendererBuilder::new(nbs, sample_rate).build()
+    pub fn new(note_stream: T, instrument_set: &InstrumentSet, sample_rate: SampleRate) -> Self {
+        NbsAudioRendererBuilder::new(note_stream, instrument_set, sample_rate).build()
     }
 
     pub fn with_audio_provider(
-        nbs: P,
+        note_stream: T,
+        instrument_set: &InstrumentSet,
         sample_rate: SampleRate,
         audio_provider: impl InstrumentAudioProvider + Send + 'static,
     ) -> Self {
-        NbsAudioRendererBuilder::new(nbs, sample_rate)
+        NbsAudioRendererBuilder::new(note_stream, instrument_set, sample_rate)
             .audio_provider(audio_provider)
             .build()
     }
 
     fn new_inner(
-        nbs: P,
+        note_stream: T,
         num_threads: NonZeroUsize,
         audio_provider: Box<dyn InstrumentAudioProvider + Send>,
         prefetchable_cap: NonZeroUsize,
@@ -60,7 +62,8 @@ where
         interpolation_type: InterpolationType,
         miss_policy: NoteAudioMissPolicy,
     ) -> Self {
-        let tempo_map = TempoMap::from_nbs(nbs.borrow());
+        let tempo = note_stream.default_tempo();
+        let prefetch_note_stream = note_stream.clone();
         let audio_provider = NoteAudioProvider::new(
             num_threads,
             sample_rate,
@@ -68,17 +71,16 @@ where
             cache_capacity,
             audio_provider,
         );
+        let note_stream = Some(note_stream);
         NbsAudioRenderer {
-            nbs,
+            note_stream,
             audio_provider,
             prefetchable_cap,
+            prefetch_note_stream,
             sample_rate,
             miss_policy,
-            tick: 0,
-            prefetch_tick: 0,
             samples_until_next_tick: 0,
-            loop_count: 0,
-            tempo_map,
+            tempo,
             mixer: NoteAudioMixer::new(),
         }
     }
@@ -88,12 +90,8 @@ where
         self.sample_rate
     }
 
-    pub fn current_tick(&self) -> Tick {
-        self.tick
-    }
-
     pub fn current_tempo(&self) -> f32 {
-        self.tempo_map.get_tempo_at(self.tick)
+        self.tempo
     }
 
     pub fn playing_sounds_count(&self) -> usize {
@@ -102,91 +100,53 @@ where
 
     //TODO: 曲の長さをDurationで取得する関数を追加したい。
 
-    pub fn seek_to_tick(&mut self, tick: Tick) {
-        self.tick = tick;
-        self.prefetch_tick = tick;
-        self.samples_until_next_tick = 0;
-    }
-
     fn samples_per_tick(&self) -> usize {
-        let tempo = self.tempo_map.get_tempo_at(self.tick);
-        (self.sample_rate().get() as f32 / tempo).round() as usize
-    }
-
-    fn loop_if_needed(&mut self) -> bool {
-        let looping = &self.nbs.borrow().header.song_meta.looping;
-        if looping.enabled {
-            match looping.count {
-                Some(count) if self.loop_count < count.get() => {
-                    self.loop_count += 1;
-                    self.seek_to_tick(looping.start_tick as u32);
-                }
-                Some(_) if self.mixer.is_empty() => return false,
-                Some(_) => {}
-                None => self.seek_to_tick(looping.start_tick as u32),
-            }
-        } else if self.mixer.is_empty() {
-            return false;
-        }
-        true
+        (self.sample_rate().get() as f32 / self.tempo).round() as usize
     }
 
     fn tick(&mut self) {
-        while self.audio_provider.prefetched_count() < self.prefetchable_cap.get()
-            && self.prefetch_tick < self.nbs.borrow().note_blocks.ticks_len()
-        {
-            if let Some(notes_in_tick) = self
-                .nbs
-                .borrow()
-                .note_blocks
-                .notes_at_tick(self.prefetch_tick)
-            {
-                for (_, note) in notes_in_tick {
-                    let custom_instrument = self
-                        .nbs
-                        .borrow()
-                        .instrument_set
-                        .custom_instrument(note.instrument);
-                    self.audio_provider.prefetch(*note, custom_instrument);
-                }
-            }
-            self.prefetch_tick += 1;
-        }
-        if let Some(notes_in_tick) = self
-            .nbs
-            .borrow()
-            .note_blocks
-            .notes_at_tick(self.tick)
-            .cloned()
-        {
-            for (layer, note) in notes_in_tick {
-                let layer = self.nbs.borrow().note_blocks.layer(layer);
-                let custom_instrument = self
-                    .nbs
-                    .borrow()
-                    .instrument_set
-                    .custom_instrument(note.instrument);
-                let audio =
-                    self.audio_provider
-                        .get(note, layer, custom_instrument, self.miss_policy);
-                if let Some(audio) = audio {
-                    self.mixer.mix_note(audio);
+        if let Some(prefetch_note_stream) = &mut self.prefetch_note_stream {
+            while self.audio_provider.prefetched_count() < self.prefetchable_cap.get() {
+                match prefetch_note_stream.next_event() {
+                    NoteStreamEvent::NotePlay { note, weight } => {
+                        self.audio_provider.prefetch(note, weight);
+                    }
+                    NoteStreamEvent::EndOfStream => {
+                        self.prefetch_note_stream = None;
+                        break;
+                    }
+                    _ => {}
                 }
             }
         }
-        self.tick += 1;
+        while let Some(note_stream) = &mut self.note_stream {
+            match note_stream.next_event() {
+                NoteStreamEvent::NotePlay { note, weight } => {
+                    let audio = self.audio_provider.get(note, weight, self.miss_policy);
+                    if let Some(audio) = audio {
+                        self.mixer.mix_note(audio);
+                    }
+                }
+                NoteStreamEvent::TempoChange(tempo) => self.tempo = tempo,
+                NoteStreamEvent::TickAdvance => break,
+                NoteStreamEvent::EndOfStream => {
+                    self.note_stream = None;
+                    break;
+                }
+            }
+        }
     }
 }
 
-impl<P> Iterator for NbsAudioRenderer<P>
+impl<T> Iterator for NbsAudioRenderer<T>
 where
-    P: Borrow<Nbs>,
+    T: NoteStream,
 {
     type Item = Frame;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.samples_until_next_tick == 0 {
-            if self.tick >= self.nbs.borrow().note_blocks.ticks_len() && !self.loop_if_needed() {
+            if self.note_stream.is_none() && self.mixer.is_empty() {
                 return None;
             }
             self.tick();
@@ -198,11 +158,11 @@ where
     }
 }
 
-pub struct NbsAudioRendererBuilder<P>
+pub struct NbsAudioRendererBuilder<T>
 where
-    P: Borrow<Nbs>,
+    T: NoteStream,
 {
-    nbs: P,
+    note_stream: T,
     num_threads: NonZeroUsize,
     miss_policy: NoteAudioMissPolicy,
     audio_provider: Box<dyn InstrumentAudioProvider + Send>,
@@ -212,17 +172,17 @@ where
     interpolation_type: InterpolationType,
 }
 
-impl<P> NbsAudioRendererBuilder<P>
+impl<T> NbsAudioRendererBuilder<T>
 where
-    P: Borrow<Nbs>,
+    T: NoteStream,
 {
-    pub fn new(nbs: P, sample_rate: SampleRate) -> Self {
+    pub fn new(note_stream: T, instrument_set: &InstrumentSet, sample_rate: SampleRate) -> Self {
         NbsAudioRendererBuilder {
             audio_provider: Box::new(VanillaAudioProvider::new(
-                nbs.borrow().instrument_set.vanilla_instrument_count(),
+                instrument_set.vanilla_instrument_count(),
             )),
             prefetchable_cap: 256.try_into().unwrap(),
-            nbs,
+            note_stream,
             cache_capacity: Some(NonZeroUsize::new(256).unwrap()),
             miss_policy: NoteAudioMissPolicy::SyncFallback,
             sample_rate,
@@ -270,9 +230,9 @@ where
         self
     }
 
-    pub fn build(self) -> NbsAudioRenderer<P> {
+    pub fn build(self) -> NbsAudioRenderer<T> {
         NbsAudioRenderer::new_inner(
-            self.nbs,
+            self.note_stream,
             self.num_threads,
             self.audio_provider,
             self.prefetchable_cap,

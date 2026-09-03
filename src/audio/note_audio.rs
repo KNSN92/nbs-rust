@@ -19,8 +19,8 @@ use crate::{
         provider::InstrumentAudioProvider,
         resampler::{InterpolationType, resample_audio},
     },
-    instrument::{CustomInstrument, Instrument},
-    noteblock::{Layer, Note},
+    instrument::Instrument,
+    noteblock::Note,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -81,20 +81,19 @@ pub struct NoteAudio {
 impl NoteAudio {
     pub fn new(
         note: &Note,
-        layer: Option<&Layer>,
-        custom_instrument: Option<&CustomInstrument>,
+        weight: NoteWeight,
         provider: &dyn InstrumentAudioProvider,
         sample_rate: SampleRate,
         interpolation_type: InterpolationType,
     ) -> Option<Self> {
         let audio = provider.get_audio(note.instrument)?;
-        let pitch = pitch(note, custom_instrument);
+        let pitch = pitch(note, weight);
         let frames = resample_audio(&audio, pitch, sample_rate, interpolation_type)?;
         let frames = Frames::from_vec(frames);
 
         Some(NoteAudio {
             frames,
-            multiplier: multiplier(note, layer),
+            multiplier: multiplier(note, weight),
             sample_rate,
             pos: 0,
         })
@@ -103,12 +102,12 @@ impl NoteAudio {
     fn from_frames(
         frames: Frames,
         note: Note,
-        layer: Option<&Layer>,
+        weight: NoteWeight,
         sample_rate: SampleRate,
     ) -> Self {
         NoteAudio {
             frames,
-            multiplier: multiplier(&note, layer),
+            multiplier: multiplier(&note, weight),
             sample_rate,
             pos: 0,
         }
@@ -123,10 +122,10 @@ impl NoteAudio {
         Duration::from_secs_f64(self.frames.len() as f64 / self.sample_rate.get() as f64)
     }
 
-    pub fn for_note(&self, note: &Note, layer: Option<&Layer>) -> Self {
+    pub fn for_note(&self, note: &Note, weight: NoteWeight) -> Self {
         NoteAudio {
             frames: self.frames.clone(),
-            multiplier: multiplier(note, layer),
+            multiplier: multiplier(note, weight),
             sample_rate: self.sample_rate,
             pos: 0,
         }
@@ -159,25 +158,40 @@ impl NoteAudio {
     }
 }
 
-fn multiplier(note: &Note, layer: Option<&Layer>) -> f32x16 {
-    let volume = volume(note, layer);
-    let panning = panning(note, layer);
+#[derive(Debug, Clone, Copy)]
+pub struct NoteWeight {
+    pub volume: u8,
+    pub panning: u8,
+    pub key: u8,
+}
+
+impl Default for NoteWeight {
+    fn default() -> Self {
+        NoteWeight {
+            volume: 100,
+            panning: 100,
+            key: 45,
+        }
+    }
+}
+
+fn multiplier(note: &Note, weight: NoteWeight) -> f32x16 {
+    let volume = volume(note, weight);
+    let panning = panning(note, weight);
     // Safely transmute the array of 2-element arrays into a 16-element array, since we know the size is correct.
     let multiplier: [f32; 16] =
         unsafe { mem::transmute([[panning[0] * volume, panning[1] * volume]; 8]) };
     f32x16::new(multiplier)
 }
 
-fn volume(note: &Note, layer: Option<&Layer>) -> f32 {
-    let layer_volume = layer
-        .map(|layer| layer.volume as f32 / 100.0)
-        .unwrap_or(1.0);
+fn volume(note: &Note, weight: NoteWeight) -> f32 {
+    let layer_volume = weight.volume as f32 / 100.0;
     let note_volume = note.volume as f32 / 100.0;
     note_volume * layer_volume
 }
 
-fn panning(note: &Note, layer: Option<&Layer>) -> [f32; 2] {
-    let layer_panning = layer.map(|l| l.panning as f32 / 100.0).unwrap_or(0.0);
+fn panning(note: &Note, weight: NoteWeight) -> [f32; 2] {
+    let layer_panning = weight.panning as f32 / 100.0;
     let note_panning = note.panning as f32 / 100.0;
     let panning = match layer_panning {
         0.0 => note_panning,
@@ -186,10 +200,8 @@ fn panning(note: &Note, layer: Option<&Layer>) -> [f32; 2] {
     [2.0 - panning, panning]
 }
 
-pub(crate) fn pitch(note: &Note, custom_instrument: Option<&CustomInstrument>) -> f64 {
-    let instrument_key = custom_instrument
-        .map(|ci| ci.key as f64 - 45.0)
-        .unwrap_or(0.0);
+pub(crate) fn pitch(note: &Note, weight: NoteWeight) -> f64 {
+    let instrument_key = weight.key as f64 - 45.0;
     let pitch = note.pitch as f64;
     let key = note.key as f64;
     let key = key + instrument_key + pitch / 100.0;
@@ -298,7 +310,7 @@ impl NoteAudioProvider {
         }
     }
 
-    pub fn prefetch(&mut self, note: Note, custom_instrument: Option<&CustomInstrument>) {
+    pub fn prefetch(&mut self, note: Note, weight: NoteWeight) {
         let key = NoteAudioKey::from(note);
         if let Some(audio) = self.audio_cache.get(&key) {
             self.prefetched_audios
@@ -312,7 +324,7 @@ impl NoteAudioProvider {
         let Some(audio) = self.provider.get_audio(note.instrument) else {
             return;
         };
-        let pitch = pitch(&note, custom_instrument);
+        let pitch = pitch(&note, weight);
         let is_err = self
             .task_tx
             .as_ref()
@@ -334,8 +346,7 @@ impl NoteAudioProvider {
     pub fn get(
         &mut self,
         note: Note,
-        layer: Option<&Layer>,
-        custom_instrument: Option<&CustomInstrument>,
+        weight: NoteWeight,
         policy: NoteAudioMissPolicy,
     ) -> Option<NoteAudio> {
         self.receive_results();
@@ -343,13 +354,18 @@ impl NoteAudioProvider {
         match self.get_prefetched(key) {
             PrefetchedAudio::Ready(audio) => {
                 self.audio_cache.put(key, audio.clone());
-                return Some(NoteAudio::from_frames(audio, note, layer, self.sample_rate));
+                return Some(NoteAudio::from_frames(
+                    audio,
+                    note,
+                    weight,
+                    self.sample_rate,
+                ));
             }
             PrefetchedAudio::Failed => return None,
             _ => {}
         }
         if let Some(audio) = self.audio_cache.get(&key) {
-            let audio = NoteAudio::from_frames(audio.clone(), note, layer, self.sample_rate);
+            let audio = NoteAudio::from_frames(audio.clone(), note, weight, self.sample_rate);
             self.consume_prefetched(key);
             return Some(audio);
         }
@@ -357,12 +373,12 @@ impl NoteAudioProvider {
             NoteAudioMissPolicy::SyncFallback => {
                 self.consume_prefetched(key);
                 if let Some(audio) = self.provider.get_audio(note.instrument) {
-                    let pitch = pitch(&note, custom_instrument);
+                    let pitch = pitch(&note, weight);
                     let frames =
                         resample_audio(&audio, pitch, self.sample_rate, self.interpolation_type)?;
                     let frames = Frames::from_vec(frames);
                     self.audio_cache.put(key, frames.clone());
-                    let audio = NoteAudio::from_frames(frames, note, layer, self.sample_rate);
+                    let audio = NoteAudio::from_frames(frames, note, weight, self.sample_rate);
                     Some(audio)
                 } else {
                     None
@@ -370,7 +386,7 @@ impl NoteAudioProvider {
             }
             NoteAudioMissPolicy::Wait(timeout) => {
                 if !self.prefetched_audios.contains_key(&key) {
-                    self.prefetch(note, custom_instrument);
+                    self.prefetch(note, weight);
                 }
                 let timeout = timeout.unwrap_or(Duration::MAX);
                 let start = std::time::Instant::now();
@@ -395,7 +411,12 @@ impl NoteAudioProvider {
                     }
                 };
                 self.audio_cache.put(key, audio.clone());
-                Some(NoteAudio::from_frames(audio, note, layer, self.sample_rate))
+                Some(NoteAudio::from_frames(
+                    audio,
+                    note,
+                    weight,
+                    self.sample_rate,
+                ))
             }
             NoteAudioMissPolicy::Skip => {
                 self.consume_prefetched(key);
