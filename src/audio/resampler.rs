@@ -2,7 +2,7 @@ use rubato::{
     Async, FixedAsync, PolynomialDegree, Resampler, audioadapter_buffers::direct::InterleavedSlice,
 };
 
-use crate::audio::{Frame, InstrumentAudio, SampleRate};
+use crate::audio::{Frame, SampleRate, instrument::InstrumentAudio};
 
 #[derive(Debug, Clone, Copy)]
 pub enum InterpolationType {

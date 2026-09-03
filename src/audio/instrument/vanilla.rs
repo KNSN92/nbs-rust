@@ -1,6 +1,6 @@
 use std::sync::LazyLock;
 
-use crate::{audio::InstrumentAudio, instrument::VANILLA_INSTRUMENT_COUNT};
+use crate::{audio::instrument::InstrumentAudio, instrument::VANILLA_INSTRUMENT_COUNT};
 
 fn decode_vorbis(vorbis_bin: &'static [u8]) -> InstrumentAudio {
     InstrumentAudio::from_bytes(vorbis_bin, Some("ogg")).unwrap()
@@ -8,7 +8,7 @@ fn decode_vorbis(vorbis_bin: &'static [u8]) -> InstrumentAudio {
 
 macro_rules! audio {
     ($file:expr $(,)?) => {
-        include_bytes!(concat!("../../audio/", $file))
+        include_bytes!(concat!("../../../audio/", $file))
     };
 }
 

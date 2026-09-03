@@ -15,7 +15,7 @@ use symphonia::{
 };
 use thiserror::Error;
 
-use crate::audio::{Channels, InstrumentAudio, SampleRate};
+use crate::audio::{Channels, SampleRate, instrument::InstrumentAudio};
 
 #[derive(Debug, Error)]
 pub enum DecodeAudioError {

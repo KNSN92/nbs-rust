@@ -1,9 +1,10 @@
 use std::{fs::File, path::Path};
 
 use crate::{
-    audio::{InstrumentAudio, vanilla_audio::VANILLA_AUDIOS},
-    instrument::Instrument,
-    instrument::{CustomInstrument, InstrumentSet, TEMPO_CHANGER, VANILLA_INSTRUMENT_COUNT},
+    audio::instrument::{InstrumentAudio, VANILLA_AUDIOS},
+    instrument::{
+        CustomInstrument, Instrument, InstrumentSet, TEMPO_CHANGER, VANILLA_INSTRUMENT_COUNT,
+    },
 };
 
 pub trait InstrumentAudioProvider {

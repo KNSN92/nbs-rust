@@ -2,7 +2,7 @@ use std::{borrow::Borrow, collections::VecDeque, sync::Arc};
 
 use crate::{
     Nbs, Tick,
-    audio::{NoteWeight, TempoMap},
+    audio::{TempoMap, note::NoteWeight},
     noteblock::{Layer, Note},
 };
 

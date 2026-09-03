@@ -10,8 +10,10 @@ use lru::LruCache;
 
 use crate::{
     audio::{
-        Frames, InstrumentAudio, NoteAudio, NoteAudioKey, NoteWeight, SampleRate,
-        instrument_provider::InstrumentAudioProvider,
+        SampleRate,
+        instrument::InstrumentAudio,
+        instrument::InstrumentAudioProvider,
+        note::{Frames, NoteAudio, NoteAudioKey, NoteWeight},
         resampler::{InterpolationType, resample_audio},
     },
     noteblock::Note,

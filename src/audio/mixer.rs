@@ -2,7 +2,7 @@ use std::mem;
 
 use wide::f32x16;
 
-use crate::audio::{Frame, NoteAudio};
+use crate::audio::{Frame, note::NoteAudio};
 
 #[derive(Debug)]
 pub struct NoteAudioMixer {

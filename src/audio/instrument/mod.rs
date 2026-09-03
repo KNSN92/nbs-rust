@@ -1,9 +1,14 @@
+mod decoder;
+mod provider;
+mod vanilla;
+
+pub use decoder::*;
+pub use provider::*;
+pub use vanilla::VANILLA_AUDIOS;
+
 use std::{fs::File, io::Cursor, num::NonZeroU32, sync::Arc, time::Duration};
 
-use crate::audio::{
-    Channels, Frame, SampleRate,
-    decoder::{DecodeAudioError, decode_audio},
-};
+use crate::audio::{Channels, Frame, SampleRate};
 
 #[derive(Debug, Clone)]
 pub struct InstrumentAudio {

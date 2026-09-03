@@ -2,9 +2,9 @@ use std::num::NonZeroUsize;
 
 use crate::audio::{
     Frame, NoteStream, NoteStreamEvent, SampleRate,
-    instrument_provider::InstrumentAudioProvider,
+    instrument::InstrumentAudioProvider,
     mixer::NoteAudioMixer,
-    noteaudio_provider::{CacheCapacity, NoteAudioMissPolicy, NoteAudioProvider, NumThreads},
+    note::{CacheCapacity, NoteAudioMissPolicy, NoteAudioProvider, NumThreads},
     resampler::InterpolationType,
 };
 
