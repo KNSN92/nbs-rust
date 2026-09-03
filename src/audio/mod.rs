@@ -1,8 +1,9 @@
 mod decoder;
 mod instrument_audio;
+pub mod instrument_provider;
 mod mixer;
 mod note_audio;
-pub mod provider;
+mod noteaudio_provider;
 mod renderer;
 mod resampler;
 mod stream;
@@ -13,6 +14,7 @@ use std::num::{NonZeroU16, NonZeroU32};
 
 pub use instrument_audio::InstrumentAudio;
 pub use note_audio::*;
+pub use noteaudio_provider::*;
 pub use renderer::*;
 pub use stream::*;
 pub use tempo::TempoMap;
