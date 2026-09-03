@@ -2,7 +2,7 @@ use rubato::{
     Async, FixedAsync, PolynomialDegree, Resampler, audioadapter_buffers::direct::InterleavedSlice,
 };
 
-use crate::audio::{Frame, Frames, SampleRate, resampler::NoteAudioResampler};
+use crate::audio::{Frame, Frames, SampleRate, resampler::SyncAudioResampler};
 
 #[derive(Debug, Clone, Copy)]
 pub enum InterpolationType {
@@ -33,7 +33,7 @@ impl PolynomialResampler {
     }
 }
 
-impl NoteAudioResampler for PolynomialResampler {
+impl SyncAudioResampler for PolynomialResampler {
     fn resample(&self, frames: Frames, sample_rate: SampleRate, pitch: f64) -> Option<Frames> {
         let frame_count = frames.len();
         if frame_count == 0 {

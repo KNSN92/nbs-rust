@@ -3,7 +3,7 @@ pub mod instrument;
 mod mixer;
 pub mod note;
 mod renderer;
-mod resampler;
+pub mod resampler;
 mod stream;
 mod tempo;
 

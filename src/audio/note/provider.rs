@@ -14,7 +14,7 @@ use crate::{
         instrument::{InstrumentAudio, InstrumentAudioProvider},
         note::{Frames, NoteAudio, NoteAudioKey, NoteWeight},
         resampler::{
-            NoteAudioResampler,
+            SyncAudioResampler,
             polynomial::{InterpolationType, PolynomialResampler},
         },
     },
