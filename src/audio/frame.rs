@@ -5,7 +5,7 @@ use crate::audio::Channels;
 pub type Frame = [f32; 2]; // Nbs sound is stereo, so 2 channels
 
 #[derive(Debug, Clone)]
-pub struct Frames(usize, Arc<[Frame]>);
+pub struct Frames(Arc<[Frame]>, usize);
 
 impl Frames {
     pub fn from_vec(mut frames: Vec<Frame>) -> Self {
@@ -16,11 +16,11 @@ impl Frames {
             Some(&EMPTY_CHUNK) => len -= 8,
             _ => frames.extend(repeat_n([0.0, 0.0], 8)),
         }
-        Frames(len, frames.into())
+        Frames(frames.into(), len)
     }
 
     pub fn as_raw_parts(&self) -> (*const Frame, usize) {
-        (self.1.as_ptr(), self.0)
+        (self.0.as_ptr(), self.1)
     }
 }
 
@@ -28,7 +28,7 @@ impl Deref for Frames {
     type Target = [Frame];
 
     fn deref(&self) -> &Self::Target {
-        &self.1[..self.0]
+        &self.0[..self.1]
     }
 }
 
