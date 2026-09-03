@@ -160,18 +160,13 @@ impl NoteAudioProvider {
         match self.get_prefetched(key) {
             PrefetchedAudio::Ready(audio) => {
                 self.audio_cache.put(key, audio.clone());
-                return Some(NoteAudio::from_frames(
-                    audio,
-                    note,
-                    weight,
-                    self.sample_rate,
-                ));
+                return Some(NoteAudio::new(audio, note, weight, self.sample_rate));
             }
             PrefetchedAudio::Failed => return None,
             _ => {}
         }
         if let Some(audio) = self.audio_cache.get(&key) {
-            let audio = NoteAudio::from_frames(audio.clone(), note, weight, self.sample_rate);
+            let audio = NoteAudio::new(audio.clone(), note, weight, self.sample_rate);
             self.consume_prefetched(key);
             return Some(audio);
         }
@@ -184,7 +179,7 @@ impl NoteAudioProvider {
                         resample_audio(&audio, pitch, self.sample_rate, self.interpolation_type)?;
                     let frames = Frames::from_vec(frames);
                     self.audio_cache.put(key, frames.clone());
-                    let audio = NoteAudio::from_frames(frames, note, weight, self.sample_rate);
+                    let audio = NoteAudio::new(frames, note, weight, self.sample_rate);
                     Some(audio)
                 } else {
                     None
@@ -217,12 +212,7 @@ impl NoteAudioProvider {
                     }
                 };
                 self.audio_cache.put(key, audio.clone());
-                Some(NoteAudio::from_frames(
-                    audio,
-                    note,
-                    weight,
-                    self.sample_rate,
-                ))
+                Some(NoteAudio::new(audio, note, weight, self.sample_rate))
             }
             NoteAudioMissPolicy::Skip => {
                 self.consume_prefetched(key);

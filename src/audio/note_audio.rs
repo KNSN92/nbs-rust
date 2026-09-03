@@ -3,11 +3,7 @@ use std::{iter::repeat_n, mem, num::NonZeroU32, ops::Deref, sync::Arc, time::Dur
 use wide::f32x16;
 
 use crate::{
-    audio::{
-        Frame, SampleRate,
-        instrument_provider::InstrumentAudioProvider,
-        resampler::{InterpolationType, resample_audio},
-    },
+    audio::{Frame, SampleRate},
     instrument::Instrument,
     noteblock::Note,
 };
@@ -40,7 +36,7 @@ impl From<Note> for NoteAudioKey {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Frames(usize, Arc<[Frame]>);
+pub struct Frames(usize, Arc<[Frame]>);
 
 impl Frames {
     pub fn from_vec(mut frames: Vec<Frame>) -> Self {
@@ -68,32 +64,7 @@ pub struct NoteAudio {
 }
 
 impl NoteAudio {
-    pub fn new(
-        note: &Note,
-        weight: NoteWeight,
-        provider: &dyn InstrumentAudioProvider,
-        sample_rate: SampleRate,
-        interpolation_type: InterpolationType,
-    ) -> Option<Self> {
-        let audio = provider.get_audio(note.instrument)?;
-        let pitch = note.pitch(weight);
-        let frames = resample_audio(&audio, pitch, sample_rate, interpolation_type)?;
-        let frames = Frames::from_vec(frames);
-
-        Some(NoteAudio {
-            frames,
-            multiplier: multiplier(note, weight),
-            sample_rate,
-            pos: 0,
-        })
-    }
-
-    pub(crate) fn from_frames(
-        frames: Frames,
-        note: Note,
-        weight: NoteWeight,
-        sample_rate: SampleRate,
-    ) -> Self {
+    pub fn new(frames: Frames, note: Note, weight: NoteWeight, sample_rate: SampleRate) -> Self {
         NoteAudio {
             frames,
             multiplier: multiplier(&note, weight),
