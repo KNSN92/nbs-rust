@@ -48,12 +48,12 @@ impl NoteAudioMixer {
     }
 
     pub fn next_frame(&mut self) -> Frame {
+        let frame = self.chunk[self.pos];
+        self.pos += 1;
         if self.pos >= 8 {
             self.chunk = self.next_chunk();
             self.pos = 0;
         }
-        let frame = self.chunk[self.pos];
-        self.pos += 1;
         frame
     }
 }
