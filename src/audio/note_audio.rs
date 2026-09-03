@@ -272,15 +272,31 @@ enum PrefetchedAudio {
     NotFound,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct NumThreads(pub NonZeroUsize);
+
+impl Default for NumThreads {
+    fn default() -> Self {
+        let num_threads = thread::available_parallelism().unwrap_or_else(|_| 1.try_into().unwrap());
+        NumThreads(num_threads)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum CacheCapacity {
+    Bounded(NonZeroUsize),
+    Unbounded,
+}
+
 impl NoteAudioProvider {
     pub fn new(
-        num_threads: NonZeroUsize,
         sample_rate: SampleRate,
+        num_threads: NumThreads,
+        cache_cap: CacheCapacity,
         interpolation_type: InterpolationType,
-        cache_cap: Option<NonZeroUsize>,
         provider: Box<dyn InstrumentAudioProvider + Send>,
     ) -> Self {
-        let num_threads = num_threads.get();
+        let num_threads = num_threads.0.get();
         let (task_tx, task_rx) = unbounded();
         let task_tx = Some(task_tx);
         let (result_tx, result_rx) = unbounded();
@@ -295,8 +311,8 @@ impl NoteAudioProvider {
             threads.push(handle);
         }
         let audio_cache = match cache_cap {
-            Some(cap) => LruCache::new(cap),
-            None => LruCache::unbounded(),
+            CacheCapacity::Bounded(cap) => LruCache::new(cap),
+            CacheCapacity::Unbounded => LruCache::unbounded(),
         };
         Self {
             audio_cache,

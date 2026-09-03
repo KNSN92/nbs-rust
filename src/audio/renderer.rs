@@ -1,77 +1,72 @@
-use std::{num::NonZeroUsize, thread};
+use std::num::NonZeroUsize;
 
-use crate::{
-    audio::{
-        Frame, NoteAudioMissPolicy, NoteAudioProvider, NoteStream, NoteStreamEvent, SampleRate,
-        mixer::NoteAudioMixer,
-        provider::{InstrumentAudioProvider, VanillaAudioProvider},
-        resampler::InterpolationType,
-    },
-    instrument::InstrumentSet,
+use crate::audio::{
+    CacheCapacity, Frame, NoteAudioMissPolicy, NoteAudioProvider, NoteStream, NoteStreamEvent,
+    NumThreads, SampleRate, mixer::NoteAudioMixer, provider::InstrumentAudioProvider,
+    resampler::InterpolationType,
 };
+
+pub struct NbsAudioRendererParams {
+    pub num_threads: NumThreads,
+    pub miss_policy: NoteAudioMissPolicy,
+    pub prefetchable_cap: NonZeroUsize,
+    pub cache_capacity: CacheCapacity,
+    pub interpolation_type: InterpolationType,
+}
+
+impl Default for NbsAudioRendererParams {
+    fn default() -> Self {
+        NbsAudioRendererParams {
+            num_threads: NumThreads::default(),
+            miss_policy: NoteAudioMissPolicy::SyncFallback,
+            prefetchable_cap: 256.try_into().unwrap(),
+            cache_capacity: CacheCapacity::Bounded(256.try_into().unwrap()),
+            interpolation_type: InterpolationType::Cubic,
+        }
+    }
+}
 
 pub struct NbsAudioRenderer<T>
 where
     T: NoteStream,
 {
     note_stream: Option<T>,
+    audio_provider: NoteAudioProvider,
+    mixer: NoteAudioMixer,
     sample_rate: SampleRate,
     miss_policy: NoteAudioMissPolicy,
-    audio_provider: NoteAudioProvider,
     prefetchable_cap: NonZeroUsize,
     prefetch_note_stream: Option<T>,
     samples_until_next_tick: usize,
     tempo: f32,
-    mixer: NoteAudioMixer,
 }
 
 impl<T> NbsAudioRenderer<T>
 where
     T: NoteStream,
 {
-    pub fn builder(
+    pub fn new(
         note_stream: T,
-        instrument_set: &InstrumentSet,
-        sample_rate: SampleRate,
-    ) -> NbsAudioRendererBuilder<T> {
-        NbsAudioRendererBuilder::new(note_stream, instrument_set, sample_rate)
-    }
-
-    pub fn new(note_stream: T, instrument_set: &InstrumentSet, sample_rate: SampleRate) -> Self {
-        NbsAudioRendererBuilder::new(note_stream, instrument_set, sample_rate).build()
-    }
-
-    pub fn with_audio_provider(
-        note_stream: T,
-        instrument_set: &InstrumentSet,
-        sample_rate: SampleRate,
         audio_provider: impl InstrumentAudioProvider + Send + 'static,
-    ) -> Self {
-        NbsAudioRendererBuilder::new(note_stream, instrument_set, sample_rate)
-            .audio_provider(audio_provider)
-            .build()
-    }
-
-    fn new_inner(
-        note_stream: T,
-        num_threads: NonZeroUsize,
-        audio_provider: Box<dyn InstrumentAudioProvider + Send>,
-        prefetchable_cap: NonZeroUsize,
-        cache_capacity: Option<NonZeroUsize>,
         sample_rate: SampleRate,
-        interpolation_type: InterpolationType,
-        miss_policy: NoteAudioMissPolicy,
+        params: NbsAudioRendererParams,
     ) -> Self {
         let tempo = note_stream.default_tempo();
         let prefetch_note_stream = note_stream.clone();
+        let note_stream = Some(note_stream);
+        let audio_provider = Box::new(audio_provider);
         let audio_provider = NoteAudioProvider::new(
-            num_threads,
             sample_rate,
-            interpolation_type,
-            cache_capacity,
+            params.num_threads,
+            params.cache_capacity,
+            params.interpolation_type,
             audio_provider,
         );
-        let note_stream = Some(note_stream);
+        let NbsAudioRendererParams {
+            miss_policy,
+            prefetchable_cap,
+            ..
+        } = params;
         NbsAudioRenderer {
             note_stream,
             audio_provider,
@@ -155,91 +150,5 @@ where
             self.samples_until_next_tick -= 1;
         }
         Some(self.mixer.next_frame())
-    }
-}
-
-pub struct NbsAudioRendererBuilder<T>
-where
-    T: NoteStream,
-{
-    note_stream: T,
-    num_threads: NonZeroUsize,
-    miss_policy: NoteAudioMissPolicy,
-    audio_provider: Box<dyn InstrumentAudioProvider + Send>,
-    prefetchable_cap: NonZeroUsize,
-    cache_capacity: Option<NonZeroUsize>,
-    sample_rate: SampleRate,
-    interpolation_type: InterpolationType,
-}
-
-impl<T> NbsAudioRendererBuilder<T>
-where
-    T: NoteStream,
-{
-    pub fn new(note_stream: T, instrument_set: &InstrumentSet, sample_rate: SampleRate) -> Self {
-        NbsAudioRendererBuilder {
-            audio_provider: Box::new(VanillaAudioProvider::new(
-                instrument_set.vanilla_instrument_count(),
-            )),
-            prefetchable_cap: 256.try_into().unwrap(),
-            note_stream,
-            cache_capacity: Some(NonZeroUsize::new(256).unwrap()),
-            miss_policy: NoteAudioMissPolicy::SyncFallback,
-            sample_rate,
-            interpolation_type: InterpolationType::Cubic,
-            num_threads: thread::available_parallelism().unwrap_or(1.try_into().unwrap()),
-        }
-    }
-
-    pub fn num_threads(mut self, num_threads: NonZeroUsize) -> Self {
-        self.num_threads = num_threads;
-        self
-    }
-
-    pub fn miss_policy(mut self, policy: NoteAudioMissPolicy) -> Self {
-        self.miss_policy = policy;
-        self
-    }
-
-    pub fn interpolation_type(mut self, interpolation_type: InterpolationType) -> Self {
-        self.interpolation_type = interpolation_type;
-        self
-    }
-
-    pub fn cache_capacity(mut self, capacity: NonZeroUsize) -> Self {
-        self.cache_capacity = Some(capacity);
-        self
-    }
-
-    pub fn cache_unbounded(mut self) -> Self {
-        self.cache_capacity = None;
-        self
-    }
-
-    pub fn prefetchable_capacity(mut self, capacity: NonZeroUsize) -> Self {
-        self.prefetchable_cap = capacity;
-        self
-    }
-
-    pub fn audio_provider(
-        mut self,
-        audio_provider: impl InstrumentAudioProvider + Send + 'static,
-    ) -> Self {
-        self.audio_provider =
-            Box::new(audio_provider) as Box<dyn InstrumentAudioProvider + Send + 'static>;
-        self
-    }
-
-    pub fn build(self) -> NbsAudioRenderer<T> {
-        NbsAudioRenderer::new_inner(
-            self.note_stream,
-            self.num_threads,
-            self.audio_provider,
-            self.prefetchable_cap,
-            self.cache_capacity,
-            self.sample_rate,
-            self.interpolation_type,
-            self.miss_policy,
-        )
     }
 }

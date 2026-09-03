@@ -13,7 +13,7 @@ use std::num::{NonZeroU16, NonZeroU32};
 
 pub use instrument_audio::InstrumentAudio;
 pub use note_audio::*;
-pub use renderer::NbsAudioRenderer;
+pub use renderer::*;
 pub use stream::*;
 pub use tempo::TempoMap;
 
