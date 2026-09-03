@@ -6,13 +6,13 @@ pub use decoder::*;
 pub use provider::*;
 pub use vanilla::VANILLA_AUDIOS;
 
-use std::{fs::File, io::Cursor, num::NonZeroU32, sync::Arc, time::Duration};
+use std::{fs::File, io::Cursor, num::NonZeroU32, time::Duration};
 
-use crate::audio::{Channels, Frame, SampleRate, to_stereo};
+use crate::audio::{Channels, Frame, Frames, SampleRate};
 
 #[derive(Debug, Clone)]
 pub struct InstrumentAudio {
-    frames: Arc<[Frame]>, // I'm aiming for multi-threaded audio rendering, so using Arc
+    frames: Frames,
     sample_rate: SampleRate,
 }
 
@@ -31,10 +31,9 @@ impl InstrumentAudio {
         decode_audio(Cursor::new(data), hint_ext)
     }
 
-    pub fn new(samples: impl Into<Vec<f32>>, channels: Channels, sample_rate: SampleRate) -> Self {
-        let frames = to_stereo(samples.into(), channels).into();
+    pub fn new(samples: &[f32], channels: Channels, sample_rate: SampleRate) -> Self {
         InstrumentAudio {
-            frames,
+            frames: Frames::from_samples(samples, channels),
             sample_rate,
         }
     }

@@ -76,7 +76,7 @@ mod tests {
         samples[0] = 1.0;
         samples[1] = 1.0;
 
-        let audio = InstrumentAudio::new(samples, channels, source_sample_rate);
+        let audio = InstrumentAudio::new(&samples, channels, source_sample_rate);
         let pitch = 2.0f64.powf(1.0 / 12.0);
         let frames =
             resample_audio(&audio, pitch, target_sample_rate, InterpolationType::Cubic).unwrap();

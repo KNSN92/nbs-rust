@@ -8,6 +8,21 @@ pub type Frame = [f32; 2]; // Nbs sound is stereo, so 2 channels
 pub struct Frames(Arc<[Frame]>, usize);
 
 impl Frames {
+    pub fn from_samples(samples: &[f32], channels: Channels) -> Self {
+        let channels = channels.get() as usize;
+        let mut frames = Vec::with_capacity(samples.len().div_ceil(channels) * 2);
+        for frame in samples.chunks(channels) {
+            let frame = match frame {
+                [s] => [*s, *s],
+                [l, r] => [*l, *r],
+                [l, r, ..] => [*l, *r],
+                [] => break,
+            };
+            frames.push(frame)
+        }
+        Frames::from_vec(frames)
+    }
+
     pub fn from_vec(mut frames: Vec<Frame>) -> Self {
         let mut len = frames.len();
         //* 8フレーム分のパディングを追加する。ただし、最後の8フレームがすでに0.0で埋まっている場合はそれを利用し、lenを8減らす。これにより、SIMDでの読み取り時にバッファオーバーフローチェックが不要になる。
@@ -30,19 +45,4 @@ impl Deref for Frames {
     fn deref(&self) -> &Self::Target {
         &self.0[..self.1]
     }
-}
-
-pub fn to_stereo(audio: Vec<f32>, channels: Channels) -> Vec<Frame> {
-    let channels = channels.get() as usize;
-    let mut frames = Vec::with_capacity(audio.len() / channels * 2);
-    for frame in audio.chunks(channels) {
-        let frame = match frame {
-            [s] => [*s, *s],
-            [l, r] => [*l, *r],
-            [l, r, ..] => [*l, *r],
-            [] => break,
-        };
-        frames.push(frame)
-    }
-    frames
 }

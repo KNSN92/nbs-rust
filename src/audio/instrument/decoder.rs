@@ -52,7 +52,7 @@ pub fn decode_audio(
     let decoded = decode_track(&mut *format, &mut *decoder, track.id)?;
 
     Ok(InstrumentAudio::new(
-        decoded.samples,
+        decoded.samples.as_slice(),
         decoded.spec.channels,
         decoded.spec.sample_rate,
     ))
