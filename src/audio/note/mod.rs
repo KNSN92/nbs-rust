@@ -7,7 +7,7 @@ use std::{mem, num::NonZeroU32, time::Duration};
 use wide::f32x16;
 
 use crate::{
-    audio::{Frame, Frames},
+    audio::Frames,
     instrument::Instrument,
     noteblock::Note,
 };
@@ -43,7 +43,6 @@ impl From<Note> for NoteAudioKey {
 pub struct NoteAudio {
     frames: Frames,
     multiplier: f32x16,
-    pos: usize,
 }
 
 impl NoteAudio {
@@ -51,7 +50,6 @@ impl NoteAudio {
         NoteAudio {
             frames,
             multiplier: multiplier(&note, weight),
-            pos: 0,
         }
     }
 
@@ -68,35 +66,11 @@ impl NoteAudio {
         NoteAudio {
             frames: self.frames.clone(),
             multiplier: multiplier(note, weight),
-            pos: 0,
         }
     }
 
-    #[inline(always)]
-    pub(crate) fn next_chunk_simd(&mut self) -> Option<f32x16> {
-        let (frames_ptr, len) = self.frames.as_raw_parts();
-        //* lenは最後のパディングの長さを含まないため、パディングをframesの一部として境界チェックを行ってしまい、下でバッファオーバーフローが発生する事はない。
-        if self.pos >= len {
-            return None;
-        }
-        unsafe {
-            // pos番目以降のframesを指すポインタを取得する。
-            let frames_ptr = frames_ptr.add(self.pos).cast::<f32x16>();
-            self.pos += 8;
-            //* framesの最後には8フレーム分(f32 * 16個分)のパディングがあるため、上の境界チェックが正しい限り16個の連続したf32サンプルが有効な範囲内にあります。
-            //* f32x16は64-byteアライメントが行われているため、read_unalignedを使用する必要がある。
-            Some(frames_ptr.read_unaligned() * self.multiplier)
-        }
-    }
-
-    pub fn next_chunk(&mut self) -> Option<[Frame; 8]> {
-        let chunk = self.next_chunk_simd()?;
-        let chunk = unsafe { mem::transmute(chunk.to_array()) };
-        Some(chunk)
-    }
-
-    pub fn seek(&mut self, pos: usize) {
-        self.pos = pos;
+    pub(crate) fn into_parts(self) -> (Frames, f32x16) {
+        (self.frames, self.multiplier)
     }
 }
 
@@ -124,24 +98,6 @@ fn multiplier(note: &Note, weight: NoteWeight) -> f32x16 {
     let multiplier: [f32; 16] =
         unsafe { mem::transmute([[panning[0] * volume, panning[1] * volume]; 8]) };
     f32x16::new(multiplier)
-}
-
-impl Iterator for NoteAudio {
-    type Item = Frame;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        let frame = self.frames.get(self.pos).copied()?;
-        let multiplier = self.multiplier.to_array();
-        self.pos += 1;
-        Some([frame[0] * multiplier[0], frame[1] * multiplier[1]])
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let remaining = self.frames.len() - self.pos;
-        (remaining, Some(remaining))
-    }
 }
 
 impl Note {

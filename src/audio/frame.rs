@@ -38,7 +38,7 @@ impl Frames {
         self.2
     }
 
-    pub fn as_raw_parts(&self) -> (*const Frame, usize) {
+    pub(crate) fn as_raw_parts_for_mixer(&self) -> (*const Frame, usize) {
         (self.0.as_ptr(), self.1)
     }
 }

@@ -133,15 +133,8 @@ where
             }
         }
     }
-}
 
-impl<T> Iterator for NbsAudioRenderer<T>
-where
-    T: NoteStream,
-{
-    type Item = Frame;
-
-    fn next(&mut self) -> Option<Self::Item> {
+    pub fn next_frame(&mut self) -> Option<Frame> {
         if self.samples_until_next_tick == 0 {
             if self.note_stream.is_none() && self.mixer.is_empty() {
                 return None;
@@ -152,5 +145,24 @@ where
             self.samples_until_next_tick -= 1;
         }
         Some(self.mixer.next_frame())
+    }
+
+    //TODO: 何故か音割れ？になっているのでfixしないといけないよ。どこが悪いのか検討つきませ〜ん:(
+    #[allow(unused)]
+    fn fill_buffer(&mut self, buf: &mut [Frame]) {
+        let mut i = 0;
+        while i < buf.len() {
+            let remaining = buf.len() - i;
+            if remaining >= self.samples_until_next_tick {
+                self.mixer.fill_buffer(&mut buf[i..i+self.samples_until_next_tick]);
+                i += self.samples_until_next_tick;
+                self.tick();
+                self.samples_until_next_tick = self.samples_per_tick();
+            }else {
+                self.mixer.fill_buffer(&mut buf[i..]);
+                self.samples_until_next_tick -= remaining;
+                break;
+            }
+        }
     }
 }
