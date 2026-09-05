@@ -1,9 +1,9 @@
 use std::sync::LazyLock;
 
-use crate::{audio::instrument::InstrumentAudio, instrument::VANILLA_INSTRUMENT_COUNT};
+use crate::{audio::AudioBuffer, instrument::VANILLA_INSTRUMENT_COUNT};
 
-fn decode_vorbis(vorbis_bin: &'static [u8]) -> InstrumentAudio {
-    InstrumentAudio::from_bytes(vorbis_bin, Some("ogg")).unwrap()
+fn decode_vorbis(vorbis_bin: &'static [u8]) -> AudioBuffer {
+    AudioBuffer::from_file_bytes(vorbis_bin, Some("ogg")).unwrap()
 }
 
 macro_rules! audio {
@@ -12,7 +12,7 @@ macro_rules! audio {
     };
 }
 
-pub static VANILLA_AUDIOS: LazyLock<[InstrumentAudio; VANILLA_INSTRUMENT_COUNT as usize]> =
+pub static VANILLA_AUDIOS: LazyLock<[AudioBuffer; VANILLA_INSTRUMENT_COUNT as usize]> =
     LazyLock::new(|| {
         [
             decode_vorbis(audio!("harp.ogg")),

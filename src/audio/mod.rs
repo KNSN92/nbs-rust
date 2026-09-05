@@ -1,3 +1,4 @@
+mod decoder;
 pub mod instrument;
 mod mixer;
 pub mod note;
@@ -7,6 +8,8 @@ mod stream;
 mod tempo;
 
 use std::{
+    fs::File,
+    io::Cursor,
     iter::repeat_n,
     num::{NonZeroU16, NonZeroU32},
     ops::Deref,
@@ -16,6 +19,8 @@ use std::{
 pub use renderer::*;
 pub use stream::*;
 pub use tempo::TempoMap;
+
+use crate::audio::decoder::{DecodeAudioError, decode_audio};
 
 pub type SampleRate = NonZeroU32;
 pub type Channels = NonZeroU16;
@@ -54,6 +59,17 @@ impl AudioBuffer {
             _ => frames.extend(repeat_n([0.0, 0.0], 8)),
         }
         AudioBuffer(frames.into(), len, sample_rate)
+    }
+
+    pub fn from_file(file: File, hint_ext: Option<&str>) -> Result<Self, DecodeAudioError> {
+        decode_audio(file, hint_ext)
+    }
+
+    pub fn from_file_bytes(
+        data: impl AsRef<[u8]> + Send + Sync + 'static,
+        hint_ext: Option<&str>,
+    ) -> Result<Self, DecodeAudioError> {
+        decode_audio(Cursor::new(data), hint_ext)
     }
 
     pub fn sample_rate(&self) -> SampleRate {

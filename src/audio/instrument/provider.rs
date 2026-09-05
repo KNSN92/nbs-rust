@@ -1,18 +1,18 @@
 use std::{fs::File, path::Path};
 
 use crate::{
-    audio::instrument::{InstrumentAudio, VANILLA_AUDIOS},
+    audio::{AudioBuffer, instrument::VANILLA_AUDIOS},
     instrument::{
         CustomInstrument, Instrument, InstrumentSet, TEMPO_CHANGER, VANILLA_INSTRUMENT_COUNT,
     },
 };
 
 pub trait InstrumentAudioProvider {
-    fn get_audio(&self, instrument: Instrument) -> Option<InstrumentAudio>;
+    fn get_audio(&self, instrument: Instrument) -> Option<AudioBuffer>;
 }
 
 impl InstrumentAudioProvider for Box<dyn InstrumentAudioProvider + Send> {
-    fn get_audio(&self, instrument: Instrument) -> Option<InstrumentAudio> {
+    fn get_audio(&self, instrument: Instrument) -> Option<AudioBuffer> {
         self.as_ref().get_audio(instrument)
     }
 }
@@ -38,7 +38,7 @@ impl Default for VanillaAudioProvider {
 }
 
 impl InstrumentAudioProvider for VanillaAudioProvider {
-    fn get_audio(&self, instrument: Instrument) -> Option<InstrumentAudio> {
+    fn get_audio(&self, instrument: Instrument) -> Option<AudioBuffer> {
         let id = instrument.0;
         if id >= self.vanilla_instruments {
             return None;
@@ -49,7 +49,7 @@ impl InstrumentAudioProvider for VanillaAudioProvider {
 
 pub struct FileAudioProvider {
     vanilla_instruments: u8,
-    custom_instrument_audios: Vec<Option<InstrumentAudio>>,
+    custom_instrument_audios: Vec<Option<AudioBuffer>>,
 }
 
 impl FileAudioProvider {
@@ -70,7 +70,7 @@ impl FileAudioProvider {
             let path = dir.as_ref().join(&ci.file_name);
             let audio = File::open(path)
                 .ok()
-                .and_then(|file| InstrumentAudio::from_file(file, None).ok());
+                .and_then(|file| AudioBuffer::from_file(file, None).ok());
             if audio.is_none() {
                 failed_custom_instruments.push(ci);
             }
@@ -96,7 +96,7 @@ impl FileAudioProvider {
 }
 
 impl InstrumentAudioProvider for FileAudioProvider {
-    fn get_audio(&self, instrument: Instrument) -> Option<InstrumentAudio> {
+    fn get_audio(&self, instrument: Instrument) -> Option<AudioBuffer> {
         let id = instrument.0;
         if id < self.vanilla_instruments {
             VANILLA_AUDIOS.get(id as usize).cloned()

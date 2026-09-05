@@ -15,7 +15,7 @@ use symphonia::{
 };
 use thiserror::Error;
 
-use crate::audio::{Channels, SampleRate, instrument::InstrumentAudio};
+use crate::audio::{AudioBuffer, Channels, SampleRate};
 
 #[derive(Debug, Error)]
 pub enum DecodeAudioError {
@@ -42,7 +42,7 @@ pub enum DecodeAudioError {
 pub fn decode_audio(
     data: impl MediaSource + 'static,
     hint_ext: Option<&str>,
-) -> Result<InstrumentAudio, DecodeAudioError> {
+) -> Result<AudioBuffer, DecodeAudioError> {
     let mut format = probe_format(data, hint_ext)?;
     let track = select_track(&*format)?;
     let decoder_opts = DecoderOptions::default();
@@ -51,11 +51,14 @@ pub fn decode_audio(
         .map_err(|_| DecodeAudioError::UnsupportedCodec)?;
     let decoded = decode_track(&mut *format, &mut *decoder, track.id)?;
 
-    Ok(InstrumentAudio::new(
-        decoded.samples.as_slice(),
-        decoded.spec.channels,
-        decoded.spec.sample_rate,
-    ))
+    let DecodedAudio {
+        samples,
+        spec: DecodedAudioSpec {
+            channels,
+            sample_rate,
+        },
+    } = decoded;
+    Ok(AudioBuffer::from_samples(&samples, channels, sample_rate))
 }
 
 fn probe_format(

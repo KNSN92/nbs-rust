@@ -105,14 +105,10 @@ impl NoteAudioProvider {
         };
         let pitch = note.pitch(weight);
         let result_tx = self.result_tx.clone();
-        self.resampler.request_resample(
-            audio.into_inner(),
-            self.sample_rate,
-            pitch,
-            move |audio| {
+        self.resampler
+            .request_resample(audio, self.sample_rate, pitch, move |audio| {
                 result_tx.send((key, audio)).unwrap();
-            },
-        );
+            });
         self.prefetched_audios
             .insert(key, (1, NoteAudioWithState::Fetching));
     }
@@ -147,11 +143,9 @@ impl NoteAudioProvider {
                 self.consume_prefetched(key);
                 if let Some(audio) = self.provider.get_audio(note.instrument) {
                     let pitch = note.pitch(weight);
-                    let frames = self.fallback_resampler.resample(
-                        audio.into_inner(),
-                        self.sample_rate,
-                        pitch,
-                    )?;
+                    let frames =
+                        self.fallback_resampler
+                            .resample(audio, self.sample_rate, pitch)?;
                     self.audio_cache.put(key, frames.clone());
                     let audio = NoteAudio::new(frames, note, weight);
                     Some(audio)
