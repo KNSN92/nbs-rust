@@ -2,11 +2,11 @@ use std::mem;
 
 use wide::f32x16;
 
-use crate::audio::{Frame, Frames, note::NoteAudio};
+use crate::audio::{AudioBuffer, Frame, note::NoteAudio};
 
 #[derive(Debug)]
 struct PlayingNoteAudio {
-    audio: Frames,
+    audio: AudioBuffer,
     multiplier: f32x16,
     pos: usize,
 }

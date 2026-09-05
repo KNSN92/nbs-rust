@@ -8,10 +8,10 @@ pub use vanilla::VANILLA_AUDIOS;
 
 use std::{fs::File, io::Cursor, num::NonZeroU32, time::Duration};
 
-use crate::audio::{Channels, Frame, Frames, SampleRate};
+use crate::audio::{Channels, Frame, SampleRate, AudioBuffer};
 
 #[derive(Debug, Clone)]
-pub struct InstrumentAudio(Frames);
+pub struct InstrumentAudio(AudioBuffer);
 
 impl InstrumentAudio {
     pub fn from_file(
@@ -29,7 +29,7 @@ impl InstrumentAudio {
     }
 
     pub fn new(samples: &[f32], channels: Channels, sample_rate: SampleRate) -> Self {
-        InstrumentAudio(Frames::from_samples(samples, channels, sample_rate))
+        InstrumentAudio(AudioBuffer::from_samples(samples, channels, sample_rate))
     }
 
     #[inline]
@@ -52,7 +52,7 @@ impl InstrumentAudio {
         Duration::from_secs_f64(self.0.len() as f64 / self.0.sample_rate().get() as f64)
     }
 
-    pub fn into_inner(self) -> Frames {
+    pub fn into_inner(self) -> AudioBuffer {
         self.0
     }
 }

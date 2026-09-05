@@ -11,7 +11,7 @@ use crate::{
     audio::{
         SampleRate,
         instrument::InstrumentAudioProvider,
-        note::{Frames, NoteAudio, NoteAudioKey, NoteWeight},
+        note::{AudioBuffer, NoteAudio, NoteAudioKey, NoteWeight},
         resampler::{
             AsyncAudioResampler, SyncAudioResampler,
             multithreaded::{MultithreadedResampler, NumThreads},
@@ -22,13 +22,13 @@ use crate::{
 };
 
 pub struct NoteAudioProvider {
-    audio_cache: LruCache<NoteAudioKey, Frames>,
+    audio_cache: LruCache<NoteAudioKey, AudioBuffer>,
     provider: Box<dyn InstrumentAudioProvider + Send>,
     sample_rate: SampleRate,
 
     resampler: MultithreadedResampler,
-    result_tx: Sender<(NoteAudioKey, Option<Frames>)>,
-    result_rx: Receiver<(NoteAudioKey, Option<Frames>)>,
+    result_tx: Sender<(NoteAudioKey, Option<AudioBuffer>)>,
+    result_rx: Receiver<(NoteAudioKey, Option<AudioBuffer>)>,
     fallback_resampler: Box<dyn SyncAudioResampler + Send>,
 
     prefetched_audios: HashMap<NoteAudioKey, (usize, NoteAudioWithState)>,
@@ -43,13 +43,13 @@ pub enum NoteAudioMissPolicy {
 
 #[derive(Debug, Clone)]
 enum NoteAudioWithState {
-    Ready(Frames),
+    Ready(AudioBuffer),
     Failed,
     Fetching,
 }
 
 enum PrefetchedAudio {
-    Ready(Frames),
+    Ready(AudioBuffer),
     Failed,
     Fetching,
     NotFound,

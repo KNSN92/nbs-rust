@@ -6,7 +6,7 @@ use std::{mem, num::NonZeroU32, time::Duration};
 
 use wide::f32x16;
 
-use crate::{audio::Frames, instrument::Instrument, noteblock::Note};
+use crate::{audio::AudioBuffer, instrument::Instrument, noteblock::Note};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NoteAudioKey {
@@ -37,12 +37,12 @@ impl From<Note> for NoteAudioKey {
 
 #[derive(Debug, Clone)]
 pub struct NoteAudio {
-    frames: Frames,
+    frames: AudioBuffer,
     multiplier: f32x16,
 }
 
 impl NoteAudio {
-    pub fn new(frames: Frames, note: Note, weight: NoteWeight) -> Self {
+    pub fn new(frames: AudioBuffer, note: Note, weight: NoteWeight) -> Self {
         NoteAudio {
             frames,
             multiplier: multiplier(&note, weight),
@@ -65,7 +65,7 @@ impl NoteAudio {
         }
     }
 
-    pub(crate) fn into_parts(self) -> (Frames, f32x16) {
+    pub(crate) fn into_parts(self) -> (AudioBuffer, f32x16) {
         (self.frames, self.multiplier)
     }
 }

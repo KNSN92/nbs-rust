@@ -5,10 +5,10 @@ use std::thread;
 
 use crossbeam_channel::{SendError, Sender, unbounded};
 
-use crate::audio::{Frames, SampleRate};
+use crate::audio::{AudioBuffer, SampleRate};
 
 pub trait SyncAudioResampler {
-    fn resample(&self, frames: Frames, sample_rate: SampleRate, pitch: f64) -> Option<Frames>;
+    fn resample(&self, frames: AudioBuffer, sample_rate: SampleRate, pitch: f64) -> Option<AudioBuffer>;
 
     fn into_async(self) -> impl AsyncAudioResampler
     where
@@ -21,10 +21,10 @@ pub trait SyncAudioResampler {
 pub trait AsyncAudioResampler {
     fn request_resample(
         &self,
-        frames: Frames,
+        frames: AudioBuffer,
         sample_rate: SampleRate,
         pitch: f64,
-        callback: impl FnOnce(Option<Frames>) + Send + 'static,
+        callback: impl FnOnce(Option<AudioBuffer>) + Send + 'static,
     );
 
     fn into_sync(self) -> impl SyncAudioResampler
@@ -36,10 +36,10 @@ pub trait AsyncAudioResampler {
 }
 
 struct SyncToAsyncResamplerPayload(
-    Frames,
+    AudioBuffer,
     SampleRate,
     f64,
-    Box<dyn FnOnce(Option<Frames>) + Send + 'static>,
+    Box<dyn FnOnce(Option<AudioBuffer>) + Send + 'static>,
 );
 
 pub struct SyncToAsyncResamplerAdapter<T: SyncAudioResampler + Send + 'static> {
@@ -74,10 +74,10 @@ impl<T: SyncAudioResampler + Send + 'static> SyncToAsyncResamplerAdapter<T> {
 impl<T: SyncAudioResampler + Send> AsyncAudioResampler for SyncToAsyncResamplerAdapter<T> {
     fn request_resample(
         &self,
-        frames: Frames,
+        frames: AudioBuffer,
         sample_rate: SampleRate,
         pitch: f64,
-        callback: impl FnOnce(Option<Frames>) + Send + 'static,
+        callback: impl FnOnce(Option<AudioBuffer>) + Send + 'static,
     ) {
         //* senderがNoneになるのはinto_syncが呼ばれた際のみで、その時にはselfを消費するので、もうrequest_resampleを呼ぶことは出来ず、ここに到達することはないため、unwrapしても安全。
         let result = self
@@ -132,7 +132,7 @@ impl<T: AsyncAudioResampler> AsyncToSyncResamplerAdapter<T> {
 }
 
 impl<T: AsyncAudioResampler> SyncAudioResampler for AsyncToSyncResamplerAdapter<T> {
-    fn resample(&self, frames: Frames, sample_rate: SampleRate, pitch: f64) -> Option<Frames> {
+    fn resample(&self, frames: AudioBuffer, sample_rate: SampleRate, pitch: f64) -> Option<AudioBuffer> {
         let (sender, receiver) = unbounded();
         self.resampler
             .request_resample(frames, sample_rate, pitch, move |result| {

@@ -2,7 +2,7 @@ use rubato::{
     Async, FixedAsync, PolynomialDegree, Resampler, audioadapter_buffers::direct::InterleavedSlice,
 };
 
-use crate::audio::{Frame, Frames, SampleRate, resampler::SyncAudioResampler};
+use crate::audio::{Frame, AudioBuffer, SampleRate, resampler::SyncAudioResampler};
 
 #[derive(Debug, Clone, Copy)]
 pub enum InterpolationType {
@@ -34,10 +34,10 @@ impl PolynomialResampler {
 }
 
 impl SyncAudioResampler for PolynomialResampler {
-    fn resample(&self, frames: Frames, sample_rate: SampleRate, pitch: f64) -> Option<Frames> {
+    fn resample(&self, frames: AudioBuffer, sample_rate: SampleRate, pitch: f64) -> Option<AudioBuffer> {
         let frame_count = frames.len();
         if frame_count == 0 {
-            return Some(Frames::from_vec(Vec::new(), sample_rate));
+            return Some(AudioBuffer::from_vec(Vec::new(), sample_rate));
         }
         let resample_ratio = sample_rate.get() as f64 / (frames.sample_rate().get() as f64 * pitch);
         let mut resampler = Async::<f32>::new_poly(
@@ -59,7 +59,7 @@ impl SyncAudioResampler for PolynomialResampler {
             let cap = cap / 2;
             unsafe { Vec::from_raw_parts(ptr, len, cap) }
         };
-        let frames = Frames::from_vec(buf_out, sample_rate);
+        let frames = AudioBuffer::from_vec(buf_out, sample_rate);
         Some(frames)
     }
 }

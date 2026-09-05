@@ -3,7 +3,7 @@ use std::{num::NonZeroUsize, thread};
 use crossbeam_channel::{Receiver, SendError, Sender, unbounded};
 
 use crate::audio::{
-    Frames, SampleRate,
+    SampleRate, AudioBuffer,
     resampler::{AsyncAudioResampler, SyncAudioResampler},
 };
 
@@ -18,10 +18,10 @@ impl Default for NumThreads {
 }
 
 struct NoteAudioResampleTask {
-    audio: Frames,
+    audio: AudioBuffer,
     sample_rate: SampleRate,
     pitch: f64,
-    callback: Box<dyn FnOnce(Option<Frames>) + Send + 'static>,
+    callback: Box<dyn FnOnce(Option<AudioBuffer>) + Send + 'static>,
 }
 
 pub struct MultithreadedResampler {
@@ -73,10 +73,10 @@ fn worker(
 impl AsyncAudioResampler for MultithreadedResampler {
     fn request_resample(
         &self,
-        frames: Frames,
+        frames: AudioBuffer,
         sample_rate: SampleRate,
         pitch: f64,
-        callback: impl FnOnce(Option<Frames>) + Send + 'static,
+        callback: impl FnOnce(Option<AudioBuffer>) + Send + 'static,
     ) {
         if let Some(task_tx) = &self.task_tx {
             let task = NoteAudioResampleTask {
