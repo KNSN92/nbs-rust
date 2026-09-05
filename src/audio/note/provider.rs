@@ -15,7 +15,6 @@ use crate::{
         resampler::{
             AsyncAudioResampler, SyncAudioResampler,
             multithreaded::{MultithreadedResampler, NumThreads},
-            polynomial::{InterpolationType, PolynomialResampler},
         },
     },
     noteblock::Note,
@@ -62,21 +61,20 @@ pub enum CacheCapacity {
 }
 
 impl NoteAudioProvider {
-    pub fn new(
+    pub fn new<R: SyncAudioResampler + Send + 'static>(
         sample_rate: SampleRate,
         num_threads: NumThreads,
         cache_cap: CacheCapacity,
-        interpolation_type: InterpolationType,
+        new_resampler: fn() -> R,
         provider: Box<dyn InstrumentAudioProvider + Send>,
     ) -> Self {
         let audio_cache = match cache_cap {
             CacheCapacity::Bounded(cap) => LruCache::new(cap),
             CacheCapacity::Unbounded => LruCache::unbounded(),
         };
+        let fallback_resampler = Box::new(new_resampler());
         let (result_tx, result_rx) = unbounded();
-        let resampler = MultithreadedResampler::new(num_threads, || {
-            PolynomialResampler::new(interpolation_type)
-        });
+        let resampler = MultithreadedResampler::new(num_threads, new_resampler);
         Self {
             audio_cache,
             provider,
@@ -84,7 +82,7 @@ impl NoteAudioProvider {
             resampler,
             result_tx,
             result_rx,
-            fallback_resampler: Box::new(PolynomialResampler::new(interpolation_type)),
+            fallback_resampler,
             prefetched_audios: HashMap::new(),
         }
     }

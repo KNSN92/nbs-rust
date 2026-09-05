@@ -5,25 +5,29 @@ use crate::audio::{
     instrument::InstrumentAudioProvider,
     mixer::NoteAudioMixer,
     note::{CacheCapacity, NoteAudioMissPolicy, NoteAudioProvider},
-    resampler::{multithreaded::NumThreads, polynomial::InterpolationType},
+    resampler::{
+        SyncAudioResampler,
+        multithreaded::NumThreads,
+        polynomial::{InterpolationType, PolynomialResampler},
+    },
 };
 
-pub struct NbsAudioRendererParams {
+pub struct NbsAudioRendererParams<R: SyncAudioResampler + Send + 'static> {
     pub num_threads: NumThreads,
     pub miss_policy: NoteAudioMissPolicy,
     pub prefetchable_cap: NonZeroUsize,
     pub cache_capacity: CacheCapacity,
-    pub interpolation_type: InterpolationType,
+    pub new_resampler: fn() -> R,
 }
 
-impl Default for NbsAudioRendererParams {
+impl Default for NbsAudioRendererParams<PolynomialResampler> {
     fn default() -> Self {
         NbsAudioRendererParams {
             num_threads: NumThreads::default(),
             miss_policy: NoteAudioMissPolicy::SyncFallback,
             prefetchable_cap: 256.try_into().unwrap(),
             cache_capacity: CacheCapacity::Bounded(256.try_into().unwrap()),
-            interpolation_type: InterpolationType::Cubic,
+            new_resampler: || PolynomialResampler::new(InterpolationType::Cubic),
         }
     }
 }
@@ -47,11 +51,11 @@ impl<T> NbsAudioRenderer<T>
 where
     T: NoteStream,
 {
-    pub fn new(
+    pub fn new<R: SyncAudioResampler + Send + 'static>(
         note_stream: T,
         audio_provider: impl InstrumentAudioProvider + Send + 'static,
         sample_rate: SampleRate,
-        params: NbsAudioRendererParams,
+        params: NbsAudioRendererParams<R>,
     ) -> Self {
         let tempo = note_stream.default_tempo();
         let prefetch_note_stream = note_stream.clone();
@@ -61,7 +65,7 @@ where
             sample_rate,
             params.num_threads,
             params.cache_capacity,
-            params.interpolation_type,
+            params.new_resampler,
             audio_provider,
         );
         let NbsAudioRendererParams {
