@@ -6,11 +6,7 @@ use std::{mem, num::NonZeroU32, time::Duration};
 
 use wide::f32x16;
 
-use crate::{
-    audio::Frames,
-    instrument::Instrument,
-    noteblock::Note,
-};
+use crate::{audio::Frames, instrument::Instrument, noteblock::Note};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NoteAudioKey {

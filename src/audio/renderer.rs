@@ -154,11 +154,12 @@ where
         while i < buf.len() {
             let remaining = buf.len() - i;
             if remaining >= self.samples_until_next_tick {
-                self.mixer.fill_buffer(&mut buf[i..i+self.samples_until_next_tick]);
+                self.mixer
+                    .fill_buffer(&mut buf[i..i + self.samples_until_next_tick]);
                 i += self.samples_until_next_tick;
                 self.tick();
                 self.samples_until_next_tick = self.samples_per_tick();
-            }else {
+            } else {
                 self.mixer.fill_buffer(&mut buf[i..]);
                 self.samples_until_next_tick -= remaining;
                 break;
