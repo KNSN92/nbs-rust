@@ -1,15 +1,18 @@
 use std::num::NonZeroUsize;
 
-use crate::audio::{
-    Frame, NoteStream, NoteStreamEvent, SampleRate,
-    instrument::InstrumentAudioProvider,
-    mixer::NoteAudioMixer,
-    note::{CacheCapacity, NoteAudioMissPolicy, NoteAudioProvider},
-    resampler::{
-        SyncAudioResampler,
-        multithreaded::NumThreads,
-        polynomial::{InterpolationType, PolynomialResampler},
+use crate::{
+    audio::{
+        Frame, NbsEvent, NbsStream, SampleRate,
+        instrument::InstrumentAudioProvider,
+        mixer::NoteAudioMixer,
+        note::{CacheCapacity, NoteAudioMissPolicy, NoteAudioProvider, NoteWeight},
+        resampler::{
+            SyncAudioResampler,
+            multithreaded::NumThreads,
+            polynomial::{InterpolationType, PolynomialResampler},
+        },
     },
+    noteblock::Note,
 };
 
 pub struct NbsAudioRendererParams<R: SyncAudioResampler + Send + 'static> {
@@ -34,7 +37,7 @@ impl Default for NbsAudioRendererParams<PolynomialResampler> {
 
 pub struct NbsAudioRenderer<T>
 where
-    T: NoteStream,
+    T: NbsStream<(Note, NoteWeight)>,
 {
     note_stream: Option<T>,
     audio_provider: NoteAudioProvider,
@@ -49,7 +52,7 @@ where
 
 impl<T> NbsAudioRenderer<T>
 where
-    T: NoteStream,
+    T: NbsStream<(Note, NoteWeight)>,
 {
     pub fn new<R: SyncAudioResampler + Send + 'static>(
         note_stream: T,
@@ -109,10 +112,10 @@ where
         if let Some(prefetch_note_stream) = &mut self.prefetch_note_stream {
             while self.audio_provider.prefetched_count() < self.prefetchable_cap.get() {
                 match prefetch_note_stream.next_event() {
-                    NoteStreamEvent::NotePlay { note, weight } => {
+                    NbsEvent::NotePlay((note, weight)) => {
                         self.audio_provider.prefetch(note, weight);
                     }
-                    NoteStreamEvent::EndOfStream => {
+                    NbsEvent::EndOfStream => {
                         self.prefetch_note_stream = None;
                         break;
                     }
@@ -122,15 +125,15 @@ where
         }
         while let Some(note_stream) = &mut self.note_stream {
             match note_stream.next_event() {
-                NoteStreamEvent::NotePlay { note, weight } => {
+                NbsEvent::NotePlay((note, weight)) => {
                     let audio = self.audio_provider.get(note, weight, self.miss_policy);
                     if let Some(audio) = audio {
                         self.mixer.mix_note(audio);
                     }
                 }
-                NoteStreamEvent::TempoChange(tempo) => self.tempo = tempo,
-                NoteStreamEvent::TickAdvance => break,
-                NoteStreamEvent::EndOfStream => {
+                NbsEvent::TempoChange(tempo) => self.tempo = tempo,
+                NbsEvent::TickAdvance => break,
+                NbsEvent::EndOfStream => {
                     self.note_stream = None;
                     break;
                 }

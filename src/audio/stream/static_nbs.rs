@@ -2,43 +2,23 @@ use std::{borrow::Borrow, collections::VecDeque, sync::Arc};
 
 use crate::{
     Nbs, Tick,
-    audio::{TempoMap, note::NoteWeight},
+    audio::{NbsEvent, NbsStream, TempoMap, note::NoteWeight},
     noteblock::{Layer, Note},
 };
 
-#[derive(Debug, Clone, Copy)]
-pub enum NoteStreamEvent {
-    NotePlay {
-        note: Note,
-        weight: NoteWeight,
-    },
-    TempoChange(f32),
-    /// This event indicates that all events that occur at this tick have been processed, and it is necessary to advance the time until the next tick.
-    TickAdvance,
-    EndOfStream,
-}
-
-pub trait NoteStream {
-    fn next_event(&mut self) -> NoteStreamEvent;
-    fn default_tempo(&self) -> f32;
-    fn clone(&self) -> Option<Self>
-    where
-        Self: Sized;
-}
-
 #[derive(Debug, Clone)]
-pub struct NbsStream<T: Borrow<Nbs> + Clone> {
+pub struct StaticNbsStream<T: Borrow<Nbs> + Clone> {
     nbs: T,
     tempo_map: Arc<TempoMap>,
     tick: Tick,
     loop_count: u8,
-    queued_event: VecDeque<NoteStreamEvent>,
+    queued_event: VecDeque<NbsEvent<(Note, NoteWeight)>>,
 }
 
-impl<T: Borrow<Nbs> + Clone> NbsStream<T> {
+impl<T: Borrow<Nbs> + Clone> StaticNbsStream<T> {
     pub fn new(nbs: T) -> Self {
         let tempo_map = Arc::new(TempoMap::from_nbs(nbs.borrow()));
-        NbsStream {
+        StaticNbsStream {
             nbs,
             tempo_map,
             tick: 0,
@@ -48,8 +28,8 @@ impl<T: Borrow<Nbs> + Clone> NbsStream<T> {
     }
 }
 
-impl<T: Borrow<Nbs> + Clone> NoteStream for NbsStream<T> {
-    fn next_event(&mut self) -> NoteStreamEvent {
+impl<T: Borrow<Nbs> + Clone> NbsStream<(Note, NoteWeight)> for StaticNbsStream<T> {
+    fn next_event(&mut self) -> NbsEvent<(Note, NoteWeight)> {
         if let Some(event) = self.queued_event.pop_front() {
             return event;
         }
@@ -62,13 +42,12 @@ impl<T: Borrow<Nbs> + Clone> NoteStream for NbsStream<T> {
                 self.tick = looping.start_tick as Tick;
                 self.loop_count += 1;
             } else {
-                return NoteStreamEvent::EndOfStream;
+                return NbsEvent::EndOfStream;
             }
         }
         if self.tempo_map.is_tempo_changing_tick(self.tick) {
             let tempo = self.tempo_map.get_tempo_at(self.tick);
-            self.queued_event
-                .push_back(NoteStreamEvent::TempoChange(tempo));
+            self.queued_event.push_back(NbsEvent::TempoChange(tempo));
         }
         if let Some(notes) = nbs.note_blocks.notes_at_tick(self.tick) {
             for &(layer, note) in notes {
@@ -87,15 +66,15 @@ impl<T: Borrow<Nbs> + Clone> NoteStream for NbsStream<T> {
                         weight.key = custom_instrument.key;
                     });
                 self.queued_event
-                    .push_back(NoteStreamEvent::NotePlay { note, weight });
+                    .push_back(NbsEvent::NotePlay((note, weight)));
             }
         }
-        self.queued_event.push_back(NoteStreamEvent::TickAdvance);
+        self.queued_event.push_back(NbsEvent::TickAdvance);
         self.tick += 1;
         if let Some(event) = self.queued_event.pop_front() {
             return event;
         } else {
-            return NoteStreamEvent::TickAdvance;
+            return NbsEvent::TickAdvance;
         }
     }
 

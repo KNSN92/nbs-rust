@@ -4,7 +4,7 @@ mod mixer;
 pub mod note;
 mod renderer;
 pub mod resampler;
-mod stream;
+pub mod stream;
 mod tempo;
 
 use std::{
