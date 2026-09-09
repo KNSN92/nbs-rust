@@ -1,7 +1,3 @@
-mod provider;
-
-pub use provider::*;
-
 use std::{mem, num::NonZeroU32, time::Duration};
 
 use wide::f32x16;
@@ -63,6 +59,10 @@ impl NoteAudio {
             frames: self.frames.clone(),
             multiplier: multiplier(note, weight),
         }
+    }
+
+    pub fn into_audio_buffer(self) -> AudioBuffer {
+        self.frames
     }
 
     pub(crate) fn into_parts(self) -> (AudioBuffer, f32x16) {

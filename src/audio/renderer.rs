@@ -1,88 +1,28 @@
-use std::num::NonZeroUsize;
-
-use crate::{
-    audio::{
-        Frame, NbsEvent, NbsStream, SampleRate,
-        instrument::InstrumentAudioProvider,
-        mixer::NoteAudioMixer,
-        note::{CacheCapacity, NoteAudioMissPolicy, NoteAudioProvider, NoteWeight},
-        resampler::{
-            SyncAudioResampler,
-            multithreaded::NumThreads,
-            polynomial::{InterpolationType, PolynomialResampler},
-        },
-    },
-    noteblock::Note,
+use crate::audio::{
+    Frame, NbsEvent, NbsStream, SampleRate, mixer::NoteAudioMixer, note_audio::NoteAudio,
 };
-
-pub struct NbsAudioRendererParams<R: SyncAudioResampler + Send + 'static> {
-    pub num_threads: NumThreads,
-    pub miss_policy: NoteAudioMissPolicy,
-    pub prefetchable_cap: NonZeroUsize,
-    pub cache_capacity: CacheCapacity,
-    pub new_resampler: fn() -> R,
-}
-
-impl Default for NbsAudioRendererParams<PolynomialResampler> {
-    fn default() -> Self {
-        NbsAudioRendererParams {
-            num_threads: NumThreads::default(),
-            miss_policy: NoteAudioMissPolicy::SyncFallback,
-            prefetchable_cap: 256.try_into().unwrap(),
-            cache_capacity: CacheCapacity::Bounded(256.try_into().unwrap()),
-            new_resampler: || PolynomialResampler::new(InterpolationType::Cubic),
-        }
-    }
-}
 
 pub struct NbsAudioRenderer<T>
 where
-    T: NbsStream<(Note, NoteWeight)>,
+    T: NbsStream<NoteAudio>,
 {
     note_stream: Option<T>,
-    audio_provider: NoteAudioProvider,
     mixer: NoteAudioMixer,
     sample_rate: SampleRate,
-    miss_policy: NoteAudioMissPolicy,
-    prefetchable_cap: NonZeroUsize,
-    prefetch_note_stream: Option<T>,
     samples_until_next_tick: usize,
     tempo: f32,
 }
 
 impl<T> NbsAudioRenderer<T>
 where
-    T: NbsStream<(Note, NoteWeight)>,
+    T: NbsStream<NoteAudio>,
 {
-    pub fn new<R: SyncAudioResampler + Send + 'static>(
-        note_stream: T,
-        audio_provider: impl InstrumentAudioProvider + Send + 'static,
-        sample_rate: SampleRate,
-        params: NbsAudioRendererParams<R>,
-    ) -> Self {
+    pub fn new(note_stream: T, sample_rate: SampleRate) -> Self {
         let tempo = note_stream.default_tempo();
-        let prefetch_note_stream = note_stream.clone();
         let note_stream = Some(note_stream);
-        let audio_provider = Box::new(audio_provider);
-        let audio_provider = NoteAudioProvider::new(
-            sample_rate,
-            params.num_threads,
-            params.cache_capacity,
-            params.new_resampler,
-            audio_provider,
-        );
-        let NbsAudioRendererParams {
-            miss_policy,
-            prefetchable_cap,
-            ..
-        } = params;
         NbsAudioRenderer {
             note_stream,
-            audio_provider,
-            prefetchable_cap,
-            prefetch_note_stream,
             sample_rate,
-            miss_policy,
             samples_until_next_tick: 0,
             tempo,
             mixer: NoteAudioMixer::new(),
@@ -109,29 +49,11 @@ where
     }
 
     fn tick(&mut self) {
-        if let Some(prefetch_note_stream) = &mut self.prefetch_note_stream {
-            while self.audio_provider.prefetched_count() < self.prefetchable_cap.get() {
-                match prefetch_note_stream.next_event() {
-                    NbsEvent::NotePlay((note, weight)) => {
-                        self.audio_provider.prefetch(note, weight);
-                    }
-                    NbsEvent::EndOfStream => {
-                        self.prefetch_note_stream = None;
-                        break;
-                    }
-                    _ => {}
-                }
-            }
-        }
         while let Some(note_stream) = &mut self.note_stream {
             match note_stream.next_event() {
-                NbsEvent::NotePlay((note, weight)) => {
-                    let audio = self.audio_provider.get(note, weight, self.miss_policy);
-                    if let Some(audio) = audio {
-                        self.mixer.mix_note(audio);
-                    }
-                }
+                NbsEvent::NotePlay(audio) => self.mixer.mix_note(audio),
                 NbsEvent::TempoChange(tempo) => self.tempo = tempo,
+                NbsEvent::NoOp => continue,
                 NbsEvent::TickAdvance => break,
                 NbsEvent::EndOfStream => {
                     self.note_stream = None;

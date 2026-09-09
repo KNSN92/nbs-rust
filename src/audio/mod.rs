@@ -1,7 +1,7 @@
 mod decoder;
 pub mod instrument;
 mod mixer;
-pub mod note;
+pub mod note_audio;
 mod renderer;
 pub mod resampler;
 pub mod stream;

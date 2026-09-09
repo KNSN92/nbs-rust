@@ -2,7 +2,7 @@ use std::{borrow::Borrow, collections::VecDeque, sync::Arc};
 
 use crate::{
     Nbs, Tick,
-    audio::{NbsEvent, NbsStream, TempoMap, note::NoteWeight},
+    audio::{NbsEvent, NbsStream, TempoMap, note_audio::NoteWeight},
     noteblock::{Layer, Note},
 };
 
@@ -80,12 +80,5 @@ impl<T: Borrow<Nbs> + Clone> NbsStream<(Note, NoteWeight)> for StaticNbsStream<T
 
     fn default_tempo(&self) -> f32 {
         self.nbs.borrow().header.song_meta.tempo
-    }
-
-    fn clone(&self) -> Option<Self>
-    where
-        Self: Sized + Clone,
-    {
-        Some(Clone::clone(&self))
     }
 }
