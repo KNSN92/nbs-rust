@@ -8,7 +8,12 @@ use crossbeam_channel::{SendError, Sender, unbounded};
 use crate::audio::{AudioBuffer, SampleRate};
 
 pub trait SyncAudioResampler {
-    fn resample(&self, frames: AudioBuffer, sample_rate: SampleRate, pitch: f64) -> Option<AudioBuffer>;
+    fn resample(
+        &self,
+        frames: AudioBuffer,
+        sample_rate: SampleRate,
+        pitch: f64,
+    ) -> Option<AudioBuffer>;
 
     fn into_async(self) -> impl AsyncAudioResampler
     where
@@ -132,7 +137,12 @@ impl<T: AsyncAudioResampler> AsyncToSyncResamplerAdapter<T> {
 }
 
 impl<T: AsyncAudioResampler> SyncAudioResampler for AsyncToSyncResamplerAdapter<T> {
-    fn resample(&self, frames: AudioBuffer, sample_rate: SampleRate, pitch: f64) -> Option<AudioBuffer> {
+    fn resample(
+        &self,
+        frames: AudioBuffer,
+        sample_rate: SampleRate,
+        pitch: f64,
+    ) -> Option<AudioBuffer> {
         let (sender, receiver) = unbounded();
         self.resampler
             .request_resample(frames, sample_rate, pitch, move |result| {

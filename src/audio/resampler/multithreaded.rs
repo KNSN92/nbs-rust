@@ -3,7 +3,7 @@ use std::{num::NonZeroUsize, thread};
 use crossbeam_channel::{Receiver, SendError, Sender, unbounded};
 
 use crate::audio::{
-    SampleRate, AudioBuffer,
+    AudioBuffer, SampleRate,
     resampler::{AsyncAudioResampler, SyncAudioResampler},
 };
 
