@@ -2,7 +2,7 @@ use rubato::{
     Async, FixedAsync, PolynomialDegree, Resampler, audioadapter_buffers::direct::InterleavedSlice,
 };
 
-use crate::audio::{AudioBuffer, Frame, SampleRate, resampler::SyncAudioResampler};
+use crate::audio::{AudioBuffer, SampleRate, resampler::SyncAudioResampler};
 
 #[derive(Debug, Clone, Copy)]
 pub enum InterpolationType {
@@ -56,13 +56,20 @@ impl SyncAudioResampler for PolynomialResampler {
         .ok()?;
         let buf_in = InterleavedSlice::new(frames.as_flattened(), 2, frame_count).ok()?;
         let buf_out = resampler.process_all(&buf_in, frame_count, None).ok()?;
-        //* fftにチャンネル数を2として設定しているため、buf_outのlen、capともに1/2になる。ptrはFrameにキャストし、Vecとして再構築する。
         let buf_out = {
-            let (ptr, len, cap) = buf_out.take_data().into_raw_parts();
-            let ptr = ptr as *mut Frame;
-            let len = len / 2;
-            let cap = cap / 2;
-            unsafe { Vec::from_raw_parts(ptr, len, cap) }
+            let mut buf_out = buf_out.take_data();
+            let (len, cap) = (buf_out.len(), buf_out.capacity());
+            let len_rem = len % 2;
+            if len_rem != 0 {
+                buf_out.truncate(len - len_rem);
+            }
+            let cap_rem = cap % 2;
+            if cap_rem != 0 {
+                buf_out.shrink_to(cap - cap_rem);
+            }
+            let (ptr, _, _) = buf_out.into_raw_parts();
+            //* lenとcapは2で割り切れるように調整済みなので、f32のVecを安全に[f32; 2]のVecに変換出来る。
+            unsafe { Vec::from_raw_parts(ptr.cast(), len / 2, cap / 2) }
         };
         let frames = AudioBuffer::from_vec(buf_out, sample_rate);
         Some(frames)
