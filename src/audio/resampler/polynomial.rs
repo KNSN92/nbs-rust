@@ -54,7 +54,8 @@ impl SyncAudioResampler for PolynomialResampler {
             FixedAsync::Input,
         )
         .ok()?;
-        let buf_in = InterleavedSlice::new(frames.as_flattened(), 2, frame_count).ok()?;
+        let buf_in =
+            InterleavedSlice::new(frames.as_slice().as_flattened(), 2, frame_count).ok()?;
         let buf_out = resampler.process_all(&buf_in, frame_count, None).ok()?;
         let buf_out = {
             let mut buf_out = buf_out.take_data();

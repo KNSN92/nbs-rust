@@ -12,13 +12,13 @@ use std::{
     io::Cursor,
     iter::repeat_n,
     num::{NonZeroU16, NonZeroU32},
-    ops::Deref,
     sync::Arc,
 };
 
 pub use renderer::*;
 pub use stream::*;
 pub use tempo::TempoMap;
+use wide::f32x16;
 
 use crate::audio::decoder::{DecodeAudioError, decode_audio};
 
@@ -76,15 +76,39 @@ impl AudioBuffer {
         self.2
     }
 
-    pub(crate) fn as_raw_parts_for_mixer(&self) -> (*const Frame, usize) {
-        (self.0.as_ptr(), self.1)
+    pub fn len(&self) -> usize {
+        self.1
     }
-}
 
-impl Deref for AudioBuffer {
-    type Target = [Frame];
+    pub fn actual_len(&self) -> usize {
+        self.0.len()
+    }
 
-    fn deref(&self) -> &Self::Target {
+    pub fn as_slice(&self) -> &[Frame] {
         &self.0[..self.1]
+    }
+
+    #[inline(always)]
+    pub fn get_frame(&self, index: usize) -> Option<&Frame> {
+        if index < self.1 {
+            Some(&self.0[index])
+        } else {
+            None
+        }
+    }
+
+    #[inline(always)]
+    pub(crate) fn get_chunk_simd(&self, index: usize) -> Option<f32x16> {
+        if index < self.1 {
+            let chunk = unsafe {
+                //* 8フレーム分のパディングがあるため、indexがlen未満であれば、index番目以降の8フレームは有効な範囲内にある。
+                let frames_ptr = self.0.as_ptr().add(index).cast::<f32x16>();
+                //* f32x16は64-byteアライメントが行われているため、read_unalignedを使用する必要がある。
+                frames_ptr.read_unaligned()
+            };
+            Some(chunk)
+        } else {
+            None
+        }
     }
 }
