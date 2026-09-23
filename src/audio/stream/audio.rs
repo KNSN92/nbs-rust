@@ -48,9 +48,10 @@ pub enum CacheCapacity {
     Unbounded,
 }
 
-pub struct PrefetchableNoteAudioStream<S, I>
+pub struct PrefetchableNoteAudioStream<S, C, I>
 where
-    S: NbsStream<(Note, NoteWeight)>,
+    S: NbsStream<(Note, NoteWeight), C>,
+    C: Clone,
     I: InstrumentAudioProvider,
 {
     note_stream: S,
@@ -60,7 +61,7 @@ where
     prefetch_miss_policy: NoteAudioPrefetchMissPolicy,
     audio_cache: LruCache<NoteAudioKey, Arc<PrefetchedNoteAudio>>,
     prefetchable_event_capacity: NonZeroUsize,
-    prefetched_events: VecDeque<NbsEvent<(Note, NoteWeight, Arc<PrefetchedNoteAudio>)>>,
+    prefetched_events: VecDeque<NbsEvent<(Note, NoteWeight, Arc<PrefetchedNoteAudio>), C>>,
 }
 
 pub enum NoteAudioPrefetchMissPolicy {
@@ -112,9 +113,10 @@ enum PrefetchedNoteAudioValueWithState {
     Failed,
 }
 
-impl<S, I> PrefetchableNoteAudioStream<S, I>
+impl<S, C, I> PrefetchableNoteAudioStream<S, C, I>
 where
-    S: NbsStream<(Note, NoteWeight)>,
+    S: NbsStream<(Note, NoteWeight), C>,
+    C: Clone,
     I: InstrumentAudioProvider,
 {
     pub fn new(
@@ -148,12 +150,13 @@ where
     }
 }
 
-impl<S, I> NbsStream<NoteAudio> for PrefetchableNoteAudioStream<S, I>
+impl<S, C, I> NbsStream<NoteAudio, C> for PrefetchableNoteAudioStream<S, C, I>
 where
-    S: NbsStream<(Note, NoteWeight)>,
+    S: NbsStream<(Note, NoteWeight), C>,
+    C: Clone,
     I: InstrumentAudioProvider,
 {
-    fn next_event(&mut self) -> NbsEvent<NoteAudio> {
+    fn next_event(&mut self) -> NbsEvent<NoteAudio, C> {
         while self.prefetched_events.len() < self.prefetchable_event_capacity.get() {
             match self.note_stream.next_event() {
                 NbsEvent::NotePlay((note, weight)) => {
@@ -188,6 +191,9 @@ where
                     self.prefetched_events
                         .push_back(NbsEvent::TempoChange(tempo));
                 }
+                NbsEvent::CustomEvent(c) => {
+                    self.prefetched_events.push_back(NbsEvent::CustomEvent(c));
+                }
                 NbsEvent::NoOp => {
                     self.prefetched_events.push_back(NbsEvent::NoOp);
                 }
@@ -211,6 +217,7 @@ where
                 PrefetchedNoteAudioValueWithState::NotReady => (note, weight, audio),
             },
             NbsEvent::TempoChange(tempo) => return NbsEvent::TempoChange(tempo),
+            NbsEvent::CustomEvent(c) => return NbsEvent::CustomEvent(c),
             NbsEvent::NoOp => return NbsEvent::NoOp,
             NbsEvent::TickAdvance => return NbsEvent::TickAdvance,
             NbsEvent::EndOfStream => return NbsEvent::EndOfStream,

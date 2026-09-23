@@ -1,11 +1,15 @@
+use std::marker::PhantomData;
+
 use crate::audio::{
     Frame, NbsEvent, NbsStream, SampleRate, mixer::NoteAudioMixer, note_audio::NoteAudio,
 };
 
-pub struct NbsAudioRenderer<T>
+pub struct NbsAudioRenderer<T, C>
 where
-    T: NbsStream<NoteAudio>,
+    T: NbsStream<NoteAudio, C>,
+    C: Clone,
 {
+    _custom_event_type: PhantomData<C>,
     note_stream: Option<T>,
     mixer: NoteAudioMixer,
     sample_rate: SampleRate,
@@ -13,14 +17,16 @@ where
     tempo: f32,
 }
 
-impl<T> NbsAudioRenderer<T>
+impl<T, C> NbsAudioRenderer<T, C>
 where
-    T: NbsStream<NoteAudio>,
+    T: NbsStream<NoteAudio, C>,
+    C: Clone,
 {
     pub fn new(note_stream: T, sample_rate: SampleRate) -> Self {
         let tempo = note_stream.default_tempo();
         let note_stream = Some(note_stream);
         NbsAudioRenderer {
+            _custom_event_type: std::marker::PhantomData,
             note_stream,
             sample_rate,
             samples_until_next_tick: 0,
@@ -53,6 +59,7 @@ where
             match note_stream.next_event() {
                 NbsEvent::NotePlay(audio) => self.mixer.mix_note(audio),
                 NbsEvent::TempoChange(tempo) => self.tempo = tempo,
+                NbsEvent::CustomEvent(_) => {} // CustomEventはここでは無視する
                 NbsEvent::NoOp => continue,
                 NbsEvent::TickAdvance => break,
                 NbsEvent::EndOfStream => {
