@@ -28,6 +28,11 @@ This crate aiming to provide a high-level, easy-to-use I/O interface and manipul
 
 MIT
 
+The audio files used in this project are copyrighted by Mojang and Microsoft, and are used in accordance with the following guidelines.
+[Usage Guidelines](https://www.minecraft.net/usage-guidelines)
+
+This project is not an official Minecraft project and is not affiliated with Mojang or Microsoft.
+
 ## 日本語版
 
 [WIP] まだ制作中です。のんびりちまちま作っていきます。
@@ -56,3 +61,8 @@ NBSファイルを読み書きしたり、それを元に音声を生成した�
 ## ライセンス
 
 MIT
+
+このプロジェクトで使用されている音声ファイルはMojang、およびMicrosoftの著作物であり、以下のガイドラインに従って使用されています。
+[Usage Guidelines](https://www.minecraft.net/usage-guidelines)
+
+このプロジェクトはMinecraftの公式プロジェクトではなく、MojangやMicrosoftとは関係ありません。
