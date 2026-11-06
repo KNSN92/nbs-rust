@@ -14,6 +14,7 @@ use crate::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum NbsVersion {
+    V6 = 6,
     V5 = 5,
     V4 = 4,
     V3 = 3,
@@ -24,7 +25,7 @@ pub enum NbsVersion {
 
 impl NbsVersion {
     #[allow(non_upper_case_globals)]
-    pub const Latest: NbsVersion = NbsVersion::V5;
+    pub const Latest: NbsVersion = NbsVersion::V6;
 }
 
 impl TryFrom<u8> for NbsVersion {
@@ -32,6 +33,7 @@ impl TryFrom<u8> for NbsVersion {
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
+            6 => Ok(NbsVersion::V6),
             5 => Ok(NbsVersion::V5),
             4 => Ok(NbsVersion::V4),
             3 => Ok(NbsVersion::V3),

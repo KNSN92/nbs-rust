@@ -2,7 +2,7 @@
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Instrument(pub u8);
 
-pub const VANILLA_INSTRUMENT_COUNT: u8 = 16;
+pub const VANILLA_INSTRUMENT_COUNT: u8 = 20;
 
 #[allow(non_upper_case_globals)]
 impl Instrument {
@@ -38,6 +38,14 @@ impl Instrument {
     pub const Banjo: Instrument = Instrument(14);
     /// The pling instrument, id 15.
     pub const Pling: Instrument = Instrument(15);
+    /// The trumpet instrument, id 16.
+    pub const Trumpet: Instrument = Instrument(16);
+    /// The exposed trumpet instrument, id 17.
+    pub const ExposedTrumpet: Instrument = Instrument(17);
+    /// The weathered trumpet instrument, id 18.
+    pub const WeatheredTrumpet: Instrument = Instrument(18);
+    /// The oxidized trumpet instrument, id 19.
+    pub const OxidizedTrumpet: Instrument = Instrument(19);
 }
 
 #[derive(Debug, Clone)]
